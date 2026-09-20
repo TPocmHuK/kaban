@@ -18,9 +18,12 @@
 3. ЗАЛИТЬ НА ХОСТИНГ: GitHub Pages / Netlify Drop / любой хостинг статики.
 4. Откройте ссылку, введите пароль и отправьте её партнёру — доска общая.
 
-ЧТО ВНУТРИ: канбан-доска + вкладка «Копилка» (отложить/снять, история, итоги),
-у задач: приоритет, начало/конец (дата и время), дедлайн, стоимость в ₽
-и списание стоимости из копилки одним нажатием.
+ЧТО ВНУТРИ: канбан-доска + вкладка «Копилка» (её итог виден прямо на вкладке;
+отложить/снять, история, итоги), у задач: приоритет, начало/конец (дата и время),
+дедлайн, стоимость в ₽ и списание стоимости из копилки одним нажатием;
+колонка «Напоминания» — карточки напоминаний (заголовок, описание, дедлайн),
+которые подсвечиваются тем сильнее и «горячее», чем ближе дедлайн;
+комментарии к задачам — Саша и Динара могут обсуждать задачу прямо в карточке.
 ═══════════════════════════════════════════════════════════════════
 -->
 <style>
@@ -364,6 +367,58 @@ body.dragging-active{cursor:grabbing; user-select:none; -webkit-user-select:none
 .fin-localnote{font-size:12.5px; color:var(--warn); background:rgba(217,115,13,.1); border-radius:8px; padding:8px 10px; margin-bottom:12px}
 .app.view-finance .tb-center{display:none}
 
+/* ═══════════ Колонка напоминаний: подсветка по близости дедлайна ═══════════ */
+.due.cd{font-variant-numeric:tabular-nums}
+.due.u1{color:#8a6d00;background:rgba(223,171,1,.16)}
+.due.u2{color:var(--warn);background:rgba(217,115,13,.15);font-weight:600}
+.due.u3,.due.u4,.due.u5{color:var(--danger);background:var(--danger-soft);font-weight:600}
+html[data-theme="dark"] .due.u1{color:var(--warn);background:rgba(217,179,13,.16)}
+@keyframes remGlow{
+  0%,100%{box-shadow:var(--shadow-1)}
+  50%{box-shadow:0 0 0 3px var(--glow-c), 0 0 16px 3px var(--glow-c)}
+}
+@keyframes remGlowHard{
+  0%,100%{box-shadow:0 0 0 2px var(--glow-c), 0 0 12px 2px var(--glow-c)}
+  50%{box-shadow:0 0 0 4px var(--glow-c), 0 0 24px 7px var(--glow-c)}
+}
+.card.rem.urg-1{--glow-c:rgba(223,171,1,.35); animation:remGlow 4s ease-in-out infinite}
+.card.rem.urg-2{--glow-c:rgba(217,115,13,.42); animation:remGlow 2.6s ease-in-out infinite}
+.card.rem.urg-3{--glow-c:rgba(224,62,62,.4);  animation:remGlow 1.8s ease-in-out infinite}
+.card.rem.urg-4{--glow-c:rgba(224,62,62,.6);  animation:remGlowHard 1.2s ease-in-out infinite}
+.card.rem.urg-5{--glow-c:rgba(224,62,62,.8);  animation:remGlowHard .9s ease-in-out infinite}
+
+/* ═══════════ Комментарии в карточке ═══════════ */
+.comment{display:flex; gap:9px; padding:8px 2px; border-bottom:1px solid var(--border); align-items:flex-start}
+.comment:last-child{border-bottom:none}
+.comment .avatar{width:22px; height:22px; font-size:10.5px; margin-top:1px}
+.comment-body{flex:1; min-width:0}
+.comment-head{display:flex; align-items:baseline; gap:8px}
+.comment-head b{font-size:13px}
+.comment-head time{font-size:11.5px; color:var(--text-3)}
+.comment-text{font-size:13.5px; white-space:pre-wrap; word-break:break-word}
+.comment .icon-btn{opacity:0; width:24px; height:24px}
+.comment:hover .icon-btn{opacity:1}
+.comm-empty{color:var(--text-3); font-size:13px; padding:4px 2px 8px}
+.comm-input{display:flex; gap:8px; align-items:center; margin-top:8px}
+.comm-input .inp{flex:1; min-width:0}
+#cmCommAv{width:26px; height:26px; font-size:12px; flex-shrink:0; cursor:pointer; border:none; padding:0}
+#cmComments{max-height:260px; overflow-y:auto}
+
+/* ═══════════ Сумма копилки на вкладке ═══════════ */
+.seg button .seg-sum{color:var(--accent); font-weight:700; font-size:12px; font-variant-numeric:tabular-nums}
+
+/* ═══════════ Режим напоминания в модалке карточки ═══════════ */
+#cardModal.reminder-mode #cmCheckBlock,
+#cardModal.reminder-mode #cmCommentsBlock,
+#cardModal.reminder-mode #cmLabelsBlock,
+#cardModal.reminder-mode #cmAssigneeBlock,
+#cardModal.reminder-mode #cmDueBlock,
+#cardModal.reminder-mode #cmStartBlock,
+#cardModal.reminder-mode #cmPriorityBlock,
+#cardModal.reminder-mode #cmCostBlock{display:none}
+#cardModal.reminder-mode #cmEndHourBtns{display:none}
+#cardModal:not(.reminder-mode) #cmEndDateBtns{display:none}
+
 /* ═══════════ Адаптив ═══════════ */
 @media (max-width:860px){
   .tb-center{order:3; width:100%}
@@ -402,7 +457,7 @@ body.dragging-active{cursor:grabbing; user-select:none; -webkit-user-select:none
     <input class="inp" type="password" id="loginPass" placeholder="Пароль" autocomplete="current-password">
     <p class="login-err hidden" id="loginErr">Неверный пароль</p>
     <button class="btn primary wide" type="submit">Войти</button>
-    <p class="login-hint">Пароль общий для всей семьи.
+    <p class="login-hint">Пароль общий для всей семьи.<br>Он указан в файле index.html в строке APP_PASSWORD</p>
   </form>
 </div>
 
@@ -414,7 +469,7 @@ body.dragging-active{cursor:grabbing; user-select:none; -webkit-user-select:none
       <span id="tbTitleHost"></span>
       <div class="seg" id="viewSeg" style="margin-left:4px">
         <button type="button" data-v="board" class="active"><span data-ic="board" data-ics="13"></span>Доска</button>
-        <button type="button" data-v="finance"><span data-ic="wallet" data-ics="13"></span>Копилка</button>
+        <button type="button" data-v="finance"><span data-ic="wallet" data-ics="13"></span>Копилка<span class="seg-sum" id="finTabSum"></span></button>
       </div>
     </div>
     <div class="tb-center">
@@ -497,46 +552,77 @@ body.dragging-active{cursor:grabbing; user-select:none; -webkit-user-select:none
         <div class="cm-main">
           <label class="fld">Описание</label>
           <textarea id="cmDesc" class="cm-desc" placeholder="Добавьте подробности…"></textarea>
-          <label class="fld">Чек-лист <span class="fld-hint" id="cmCheckCount"></span></label>
-          <div class="progress" id="cmProgress" style="display:none"><i></i></div>
-          <div id="cmChecklist"></div>
-          <div style="margin-top:6px">
-            <button type="button" class="btn ghost sm" id="cmAddCheck"><span data-ic="plus" data-ics="14"></span>Добавить пункт</button>
-            <input class="inp hidden" id="cmAddCheckInput" placeholder="Новый пункт — Enter, чтобы добавить" maxlength="200" autocomplete="off">
+          <div id="cmCheckBlock">
+            <label class="fld">Чек-лист <span class="fld-hint" id="cmCheckCount"></span></label>
+            <div class="progress" id="cmProgress" style="display:none"><i></i></div>
+            <div id="cmChecklist"></div>
+            <div style="margin-top:6px">
+              <button type="button" class="btn ghost sm" id="cmAddCheck"><span data-ic="plus" data-ics="14"></span>Добавить пункт</button>
+              <input class="inp hidden" id="cmAddCheckInput" placeholder="Новый пункт — Enter, чтобы добавить" maxlength="200" autocomplete="off">
+            </div>
+          </div>
+          <div id="cmCommentsBlock">
+            <label class="fld">Комментарии <span class="fld-hint" id="cmCommCount"></span></label>
+            <div id="cmComments"></div>
+            <div class="comm-input">
+              <button type="button" class="comm-av avatar husband" id="cmCommAv" title="Кто пишет"></button>
+              <input class="inp" id="cmCommText" placeholder="Написать комментарий…" maxlength="1000" autocomplete="off">
+              <button type="button" class="btn primary sm" id="cmCommSend">Отправить</button>
+            </div>
           </div>
         </div>
         <div class="cm-side">
-          <label class="fld">Метки <span class="fld-hint">до 3</span></label>
-          <div class="chips" id="cmLabels"></div>
-          <label class="fld">Исполнитель</label>
-          <div class="asg-grid" id="cmAssignee"></div>
-          <label class="fld">Дедлайн</label>
-          <input class="inp" type="date" id="cmDue">
-          <div class="date-btns">
-            <button type="button" class="btn ghost sm" data-due="0">Сегодня</button>
-            <button type="button" class="btn ghost sm" data-due="1">Завтра</button>
-            <button type="button" class="btn ghost sm" data-due="7">Через неделю</button>
-            <button type="button" class="btn ghost sm" id="cmDueClear">Убрать</button>
+          <div id="cmLabelsBlock">
+            <label class="fld">Метки <span class="fld-hint">до 3</span></label>
+            <div class="chips" id="cmLabels"></div>
           </div>
-          <label class="fld">Начало</label>
-          <input class="inp" type="datetime-local" id="cmStart">
-          <div class="date-btns">
-            <button type="button" class="btn ghost sm" data-start="0">Сегодня</button>
-            <button type="button" class="btn ghost sm" data-start="1">Завтра</button>
-            <button type="button" class="btn ghost sm" id="cmStartClear">Убрать</button>
+          <div id="cmAssigneeBlock">
+            <label class="fld">Исполнитель</label>
+            <div class="asg-grid" id="cmAssignee"></div>
           </div>
-          <label class="fld">Конец</label>
-          <input class="inp" type="datetime-local" id="cmEnd">
-          <div class="date-btns">
-            <button type="button" class="btn ghost sm" data-endh="1">+1 час</button>
-            <button type="button" class="btn ghost sm" data-endh="2">+2 часа</button>
-            <button type="button" class="btn ghost sm" id="cmEndClear">Убрать</button>
+          <div id="cmDueBlock">
+            <label class="fld">Дедлайн</label>
+            <input class="inp" type="date" id="cmDue">
+            <div class="date-btns">
+              <button type="button" class="btn ghost sm" data-due="0">Сегодня</button>
+              <button type="button" class="btn ghost sm" data-due="1">Завтра</button>
+              <button type="button" class="btn ghost sm" data-due="7">Через неделю</button>
+              <button type="button" class="btn ghost sm" id="cmDueClear">Убрать</button>
+            </div>
           </div>
-          <label class="fld">Приоритет</label>
-          <div class="chips" id="cmPriority"></div>
-          <label class="fld">Стоимость, ₽</label>
-          <input class="inp" type="number" id="cmCost" min="0" step="1" inputmode="decimal" placeholder="0">
-          <div id="cmPay"></div>
+          <div id="cmStartBlock">
+            <label class="fld">Начало</label>
+            <input class="inp" type="datetime-local" id="cmStart">
+            <div class="date-btns">
+              <button type="button" class="btn ghost sm" data-start="0">Сегодня</button>
+              <button type="button" class="btn ghost sm" data-start="1">Завтра</button>
+              <button type="button" class="btn ghost sm" id="cmStartClear">Убрать</button>
+            </div>
+          </div>
+          <div id="cmEndBlock">
+            <label class="fld" id="cmEndLabel">Конец</label>
+            <input class="inp" type="datetime-local" id="cmEnd">
+            <div class="date-btns" id="cmEndHourBtns">
+              <button type="button" class="btn ghost sm" data-endh="1">+1 час</button>
+              <button type="button" class="btn ghost sm" data-endh="2">+2 часа</button>
+              <button type="button" class="btn ghost sm" data-endclear>Убрать</button>
+            </div>
+            <div class="date-btns" id="cmEndDateBtns">
+              <button type="button" class="btn ghost sm" data-endd="0">Сегодня</button>
+              <button type="button" class="btn ghost sm" data-endd="1">Завтра</button>
+              <button type="button" class="btn ghost sm" data-endd="7">Через неделю</button>
+              <button type="button" class="btn ghost sm" data-endclear>Убрать</button>
+            </div>
+          </div>
+          <div id="cmPriorityBlock">
+            <label class="fld">Приоритет</label>
+            <div class="chips" id="cmPriority"></div>
+          </div>
+          <div id="cmCostBlock">
+            <label class="fld">Стоимость, ₽</label>
+            <input class="inp" type="number" id="cmCost" min="0" step="1" inputmode="decimal" placeholder="0">
+            <div id="cmPay"></div>
+          </div>
           <label class="fld">Создана</label>
           <div class="cm-created" id="cmCreated"></div>
         </div>
@@ -590,7 +676,7 @@ body.dragging-active{cursor:grabbing; user-select:none; -webkit-user-select:none
 /* ════════════════════════════════════════════════════════════
    КОНФИГУРАЦИЯ — поменяйте эти две строки под себя
    ════════════════════════════════════════════════════════════ */
-const APP_PASSWORD = '11062011';             // ← общий пароль для входа
+const APP_PASSWORD = 'family2025';             // ← общий пароль для входа
 /* Ваша база из «Нашей копилки» — правила базы открыты внутри rooms/{код}:
    доска → rooms/our-board-2025/board, копилка → rooms/{код комнаты}/entries */
 const FIREBASE_CONFIG = { databaseURL: 'https://nasha-kopilka-default-rtdb.asia-southeast1.firebasedatabase.app' };
@@ -608,7 +694,9 @@ const LABELS = {
   blue:  { name:'Синий',      color:'#2383e2' },
   purple:{ name:'Фиолетовый', color:'#6940a5' }
 };
-const LS = { state:'ourBoardStateV1', auth:'ourBoardAuth', theme:'ourBoardTheme', id:'ourBoardIdentity', banner:'ourBoardBannerClosed', fin:'ourBoardFinLocal', view:'ourBoardView' };
+/* ключ локального кеша зависит от ID доски (?board=) — чтобы две разные доски
+   не подмешивали карточки друг другу через localStorage */
+const LS = { state:'ourBoardStateV1_' + BOARD_ID, auth:'ourBoardAuth', theme:'ourBoardTheme', id:'ourBoardIdentity', banner:'ourBoardBannerClosed', fin:'ourBoardFinLocal', view:'ourBoardView' };
 const DEFAULT_META = { boardName:'Наша доска', husbandName:'Муж', wifeName:'Жена' };
 const PRIORITY = {
   low:  { name:'Низкий',   color:'#2383e2' },
@@ -637,6 +725,8 @@ const I = {
   check:'<path d="M20 6L9 17l-5-5"/>',
   checksq:'<path d="M9 11.5l2.5 2.5L21 4.5"/><path d="M21 12v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h11"/>',
   text:'<path d="M17 10H3M21 6H3M21 14H3M17 18H3"/>',
+  bell:'<path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>',
+  chat:'<path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>',
   trash:'<path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>',
   edit:'<path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5z"/>',
   board:'<rect x="3" y="3" width="5" height="14" rx="1.5" fill="currentColor" stroke="none"/><rect x="9.5" y="3" width="5" height="9" rx="1.5" fill="currentColor" stroke="none"/><rect x="16" y="3" width="5" height="17" rx="1.5" fill="currentColor" stroke="none"/>'
@@ -653,6 +743,7 @@ let db=null, boardRef=null;
 let dragCtx=null, pendingRemote=null, suppressClickUntil=0, lastAddedCardId=null, menuArmed=null;
 let cm = null; // открытая модалка карточки: {cardId, labels, assignee, priority, dirty}
 let finEntries = {}, finUnsub = null, finEditId = null;
+let reminderTicker = null;
 const ui = { search:'', assignee:'all', labels:new Set(), quickAdd:null, identity: localStorage.getItem(LS.id)||null, view: localStorage.getItem(LS.view)||'board' };
 const scrollMemo = {};
 
@@ -748,6 +839,30 @@ function scheduleText(card){
   if (card.startAt) return 'с ' + fmtDateTime(card.startAt);
   return 'до ' + fmtDateTime(card.endAt);
 }
+/* Срочность напоминания: 0 — далеко (>недели), 1 — 2–7 дней (жёлтый),
+   2 — 1–2 дня (оранжевый), 3 — 3–24 часа (красный), 4 — <3 часов (сильно), 5 — просрочено */
+function reminderUrgency(endAt){
+  if (!endAt) return 0;
+  const t = new Date(endAt).getTime();
+  if (isNaN(t)) return 0;
+  const diff = t - Date.now();
+  if (diff < 0) return 5;
+  const hh = diff / 3600000;
+  if (hh > 168) return 0;
+  if (hh > 48) return 1;
+  if (hh > 24) return 2;
+  if (hh > 3) return 3;
+  return 4;
+}
+function countdownText(endAt){
+  const t = endAt ? new Date(endAt).getTime() : NaN;
+  if (isNaN(t)) return '';
+  const diff = t - Date.now();
+  const past = diff < 0, a = Math.abs(diff);
+  const d = Math.floor(a/86400000), hh = Math.floor(a%86400000/3600000), mm = Math.floor(a%3600000/60000);
+  const s = d > 0 ? d+' д '+hh+' ч' : hh > 0 ? hh+' ч '+mm+' мин' : mm+' мин';
+  return past ? 'просрочено на '+s : 'осталось '+s;
+}
 function kopName(who){ return who === 'dinara' ? meta().wifeName : meta().husbandName; }
 function kopAvatar(who){ return who === 'dinara' ? 'wife' : 'husband'; }
 function sanitizeRoom(str){
@@ -764,12 +879,13 @@ function meta(){ return (state && state.meta) ? state.meta : DEFAULT_META; }
 /* ═══════════ Нормализация и сид состояния ═══════════ */
 function sortedColumnsOf(s){ return Object.values(s.columns).sort(function(a,b){ return (a.order-b.order)||(a.createdAt-b.createdAt); }); }
 function sortedColumns(){ return sortedColumnsOf(state); }
-function columnCards(colId){
-  return Object.values(state.cards).filter(function(c){ return c.columnId===colId; })
+function columnCardsIn(s, colId){
+  return Object.values(s.cards).filter(function(c){ return c.columnId===colId; })
     .sort(function(a,b){ return (a.order-b.order)||(a.createdAt-b.createdAt); });
 }
+function columnCards(colId){ return columnCardsIn(state, colId); }
 function normalizeState(raw){
-  const s = { columns:{}, cards:{}, meta:Object.assign({}, DEFAULT_META) };
+  const s = { columns:{}, cards:{}, comments:{}, meta:Object.assign({}, DEFAULT_META) };
   if (!raw || typeof raw !== 'object') return s;
   const cols = raw.columns || {};
   Object.keys(cols).forEach(function(id){
@@ -779,6 +895,7 @@ function normalizeState(raw){
       title: String(c.title || 'Колонка').slice(0,60),
       order: Number(c.order) || 0,
       color: (typeof c.color==='string' && /^#[0-9a-fA-F]{6}$/.test(c.color)) ? c.color : null,
+      isReminders: !!c.isReminders,
       createdAt: Number(c.createdAt) || 0
     };
   });
@@ -803,29 +920,45 @@ function normalizeState(raw){
       paidEntryId: (typeof c.paidEntryId==='string' && c.paidEntryId) ? c.paidEntryId : null,
       paidBy: ['sasha','dinara'].indexOf(c.paidBy)>=0 ? c.paidBy : null,
       paidAt: Number(c.paidAt) || 0,
+      type: c.type === 'reminder' ? 'reminder' : 'task',
       order: Number(c.order) || 0,
       createdAt: Number(c.createdAt) || 0,
       updatedAt: Number(c.updatedAt) || 0
     };
   });
+  /* комментарии живут в ОТДЕЛЬНОМ узле базы (comments/{cardId}),
+   поэтому целостные записи карточек никогда их не затирают */
+  const rawComments = raw.comments || {};
+  Object.keys(rawComments).forEach(function(cardId){
+    const m = rawComments[cardId];
+    if (!m || typeof m !== 'object') return;
+    s.comments[cardId] = {};
+    Object.keys(m).forEach(function(k){
+      const x = m[k]; if (!x || typeof x !== 'object') return;
+      s.comments[cardId][k] = { id:k, author: x.author === 'wife' ? 'wife' : 'husband', text: String(x.text || '').slice(0,1000), createdAt: Number(x.createdAt) || 0 };
+    });
+  });
   if (raw.meta && typeof raw.meta==='object'){
     s.meta.boardName = String(raw.meta.boardName || DEFAULT_META.boardName).slice(0,60);
     s.meta.husbandName = String(raw.meta.husbandName || DEFAULT_META.husbandName).slice(0,20);
     s.meta.wifeName = String(raw.meta.wifeName || DEFAULT_META.wifeName).slice(0,20);
+    ['seedling','initialized','defaultsCleaned','remindersAdded'].forEach(function(k){ if (raw.meta[k]) s.meta[k] = true; });
   }
   const first = sortedColumnsOf(s)[0];
   if (first){
     Object.keys(s.cards).forEach(function(id){ if (!s.columns[s.cards[id].columnId]) s.cards[id].columnId = first.id; });
-  } else { s.cards = {}; }
+  } else { s.cards = {}; s.comments = {}; }
   return s;
 }
 function defaultState(){
   const t = Date.now(); const columns = {};
-  ['Бэклог','Сегодня','В работе','Готово'].forEach(function(title,i){
+  [['Напоминания',0,true],['Бэклог',1,false],['Сегодня',2,false],['В работе',3,false],['Готово',4,false]].forEach(function(d,i){
     const cid = uid('col');
-    columns[cid] = { id:cid, title:title, order:i, color:null, createdAt:t+i };
+    columns[cid] = { id:cid, title:d[0], order:d[1], color:null, isReminders:!!d[2], createdAt:t+i };
   });
-  return { columns:columns, cards:{}, meta:Object.assign({}, DEFAULT_META) };
+  /* seedling: это ещё локальная заготовка — при первом снапшоте Firebase она
+     будет заменена удалённым состоянием (а не смержена — раньше это давало дубли колонок) */
+  return { columns:columns, cards:{}, comments:{}, meta:Object.assign({}, DEFAULT_META, { seedling:true }) };
 }
 function hasContent(s){ return Object.keys(s.columns).length>0 || Object.keys(s.cards).length>0; }
 
@@ -897,30 +1030,162 @@ function initFirebase(){
     setLocalMode('Firebase недоступен — работаем локально. Проверьте databaseURL и интернет.');
   });
 }
+function localIsSeedling(){ return !!(state && state.meta && state.meta.seedling); }
+/* Переносим офлайн-карточки из локальной заготовки в готовое состояние —
+   по совпадению названий колонок (дефолтные пересоздаются с новыми id) */
+function carryOverCards(fromS, toS){
+  let moved = false;
+  const titleMap = {};
+  Object.keys(toS.columns).forEach(function(id){ titleMap[toS.columns[id].title] = id; });
+  Object.keys(fromS.cards).forEach(function(cid){
+    const c = fromS.cards[cid];
+    const src = fromS.columns[c.columnId];
+    const target = src && titleMap[src.title];
+    if (target && !toS.cards[cid]){
+      c.columnId = target;
+      c.order = columnCardsIn(toS, target).reduce(function(m,x){ return Math.max(m,x.order); }, -1) + 1;
+      toS.cards[cid] = c;
+      if (fromS.comments && fromS.comments[cid] && !toS.comments[cid]) toS.comments[cid] = fromS.comments[cid];
+      moved = true;
+    }
+  });
+  const defTitles = ['Напоминания','Бэклог','Сегодня','В работе','Готово'];
+  Object.keys(fromS.columns).forEach(function(id){
+    const pc = fromS.columns[id];
+    if (defTitles.indexOf(pc.title) < 0 && !toS.columns[id]){ toS.columns[id] = pc; moved = true; }
+  });
+  Object.keys(fromS.cards).forEach(function(cid){
+    const c = fromS.cards[cid];
+    if (!toS.cards[cid] && toS.columns[c.columnId]){
+      toS.cards[cid] = c;
+      if (fromS.comments && fromS.comments[cid] && !toS.comments[cid]) toS.comments[cid] = fromS.comments[cid];
+      moved = true;
+    }
+  });
+  return moved;
+}
+/* Посев дефолтных колонок — только когда база действительно пуста.
+   КЛЮЧЕВОЕ: фиксированные ключи колонок (col_reminders, col_backlog…).
+   Если два устройства запустятся одновременно, оба запишут ОДИНАКОВЫЕ данные
+   в одни и те же пути — дубли и гонки невозможны в принципе (никаких замков). */
+function seedDefaults(){
+  const prev = state;
+  const t = Date.now();
+  const columns = {};
+  [['col_reminders','Напоминания',0,true],
+   ['col_backlog','Бэклог',1,false],
+   ['col_today','Сегодня',2,false],
+   ['col_inwork','В работе',3,false],
+   ['col_done','Готово',4,false]].forEach(function(d){
+    columns[d[0]] = { id:d[0], title:d[1], order:d[2], color:null, isReminders:d[3], createdAt:t };
+  });
+  state = { columns:columns, cards:{}, comments:{}, meta:Object.assign({}, DEFAULT_META, { initialized:true }) };
+  if (prev && hasContent(prev)) carryOverCards(prev, state);
+  saveLocal();
+  runMigrations();
+  renderAll();
+  try { boardRef.set(state); } catch(e){}
+}
+/* Разовые миграции после загрузки состояния:
+   1) лечение досок, пострадавших от старого бага дублей (одноимённые дефолтные
+      колонки схлопываем, карточки переносим в первую из них);
+   2) добавляем колонку напоминаний «Напоминания», если её ещё нет. */
+function runMigrations(){
+  if (!state || !state.meta) return;
+  const upd = {};
+  let changed = false;
+  const hasCols = Object.keys(state.columns).length > 0;
+  if (!state.meta.defaultsCleaned){
+    if (hasCols){
+      const defTitles = ['Бэклог','Сегодня','В работе','Готово'];
+      const seen = {}, dups = [];
+      sortedColumns().forEach(function(col){
+        if (defTitles.indexOf(col.title) >= 0){
+          if (seen[col.title]) dups.push(col); else seen[col.title] = col;
+        }
+      });
+      dups.forEach(function(dup){
+        const keepId = seen[dup.title].id;
+        let next = columnCards(keepId).reduce(function(m,c){ return Math.max(m, c.order); }, -1) + 1;
+        columnCards(dup.id).forEach(function(c){
+          c.columnId = keepId; c.order = next++;
+          upd['cards/'+c.id] = c;
+        });
+        delete state.columns[dup.id];
+        upd['columns/'+dup.id] = null;
+        changed = true;
+      });
+      state.meta.defaultsCleaned = true;
+      upd.meta = state.meta;
+    }
+  }
+  if (!state.meta.remindersAdded){
+    if (hasCols){
+      const has = Object.keys(state.columns).some(function(id){ return !!state.columns[id].isReminders; });
+      if (!has){
+        const cols = sortedColumns();
+        const id = 'col_reminders';
+        if (!state.columns[id]){
+          const col = { id:id, title:'Напоминания', order:(cols.length ? cols[0].order : 0) - 1, color:null, isReminders:true, createdAt:Date.now() };
+          state.columns[id] = col;
+          upd['columns/'+id] = col;
+          changed = true;
+        }
+      }
+      state.meta.remindersAdded = true;
+      upd.meta = state.meta;
+    }
+  }
+  if (Object.keys(upd).length) syncWrite(upd);
+  if (changed) renderBoard();
+}
 function onRemoteState(raw){
+  try{
   if (!remoteReady){
     remoteReady = true;
-    if (!raw){
-      if (hasContent(state)) boardRef.set(state);
-      else { state = defaultState(); saveLocal(); boardRef.set(state); }
+    if (raw){
+      const remote = normalizeState(raw);
+      if (localIsSeedling()){
+        /* НОВЫЙ пользователь: в localStorage только заготовка с дефолтными колонками.
+           Раньше она ДОБАВЛЯЛАСЬ к удалённому состоянию — отсюда дубли колонок.
+           Теперь удалённое состояние главнее; переносим только карточки,
+           которые пользователь успел создать за пару секунд до подключения. */
+        localIsSeedling() && (state.meta.seedling = false); // заготовка заменена реальным состоянием
+        carryOverCards(state, remote);
+        state = remote;
+        delete state.meta.seedling;
+        saveLocal();
+        if (hasContent(state)) try { boardRef.set(state); } catch(e){}
+      } else {
+        let added = false;
+        Object.keys(state.columns).forEach(function(id){ if (!remote.columns[id]){ remote.columns[id]=state.columns[id]; added=true; } });
+        Object.keys(state.cards).forEach(function(id){ if (!remote.cards[id]){ remote.cards[id]=state.cards[id]; added=true; } });
+        Object.keys(state.comments || {}).forEach(function(id){ if (!remote.comments[id] && Object.keys(state.comments[id]).length){ remote.comments[id]=state.comments[id]; added=true; } });
+        if (added){
+          const first = sortedColumnsOf(remote)[0];
+          if (first) Object.keys(remote.cards).forEach(function(id){ if (!remote.columns[remote.cards[id].columnId]) remote.cards[id].columnId = first.id; });
+        }
+        state = remote; saveLocal();
+        if (added) try { boardRef.set(state); } catch(e){}
+      }
+      runMigrations();
       renderAll(); updateSyncUI(); return;
     }
-    const remote = normalizeState(raw);
-    let added = false;
-    Object.keys(state.columns).forEach(function(id){ if (!remote.columns[id]){ remote.columns[id]=state.columns[id]; added=true; } });
-    Object.keys(state.cards).forEach(function(id){ if (!remote.cards[id]){ remote.cards[id]=state.cards[id]; added=true; } });
-    if (added){
-      const first = sortedColumnsOf(remote)[0];
-      if (first) Object.keys(remote.cards).forEach(function(id){ if (!remote.columns[remote.cards[id].columnId]) remote.cards[id].columnId = first.id; });
-    }
-    state = remote; saveLocal();
-    if (added) boardRef.set(state);
+    /* удалённая база пуста */
+    if (!hasContent(state) || localIsSeedling()) seedDefaults();
+    else try { boardRef.set(state); } catch(e){} /* реальный офлайн-контент переносим в облако */
+    runMigrations();
     renderAll(); updateSyncUI(); return;
   }
   if (dragCtx && dragCtx.started){ pendingRemote = raw; return; }
+  if (!raw) return; /* пустой снапшот (например, во время посева) — локальное состояние не затираем */
+  /* переходный снапшот посева (только meta, колонок ещё нет) —
+     не даём ему затереть локальные дефолты, полный снапшот придёт следом */
+  if (!Object.keys(raw.columns || {}).length && Object.keys(state.columns).length && raw.meta && raw.meta.initialized) return;
   const inc = normalizeState(raw);
   if (statesEqual(inc, state)) return;
   state = inc; saveLocal(); renderAll(); syncModalWithRemote();
+  }catch(e){ console.warn('[DBG] onRemoteState EXC:', e && e.message, e && e.stack); }
 }
 function syncWrite(updates){
   saveLocal();
@@ -932,6 +1197,7 @@ function setLocalMode(reason){
   if (reason && localStorage.getItem(LS.banner) !== '1'){
     const b = $('#modeBannerText'); if (b){ b.textContent = reason; $('#modeBanner').classList.remove('hidden'); }
   }
+  if (state) runMigrations(); // Firebase недоступен — миграции делаем локально
 }
 function setSync(cls){
   const badge = $('#syncBadge'); if (!badge) return;
@@ -950,11 +1216,13 @@ function updateSyncUI(){
 function addCard(colId, title){
   const t = String(title||'').trim(); if (!t || !state.columns[colId]) return null;
   const list = columnCards(colId);
+  const isRem = !!state.columns[colId].isReminders;
   const card = {
     id: uid('card'), columnId: colId, title: t.slice(0,300), description:'',
     checklist:[], labels:[], assignee:null, dueDate:null,
     priority:null, startAt:null, endAt:null, cost:null,
     paidEntryId:null, paidBy:null, paidAt:0,
+    type: isRem ? 'reminder' : 'task',
     order: list.length ? list[list.length-1].order+1 : 0,
     createdAt: Date.now(), updatedAt: Date.now()
   };
@@ -976,9 +1244,10 @@ function updateCard(id, patch, noRender){
 function deleteCard(id){
   if (!state.cards[id]) return;
   delete state.cards[id];
+  if (state.comments) delete state.comments[id];
   if (cm && cm.cardId === id){ cm = null; $('#cardModal').classList.add('hidden'); }
   renderBoard();
-  const upd = {}; upd['cards/'+id] = null;
+  const upd = {}; upd['cards/'+id] = null; upd['comments/'+id] = null;
   syncWrite(upd);
 }
 function orderBetween(prev, next){
@@ -1031,11 +1300,18 @@ function deleteColumn(id){
   if (!state.columns[id]) return;
   const upd = {}; upd['columns/'+id] = null;
   Object.keys(state.cards).forEach(function(cid){
-    if (state.cards[cid].columnId === id){ delete state.cards[cid]; upd['cards/'+cid] = null; }
+    if (state.cards[cid].columnId === id){ delete state.cards[cid]; if (state.comments) delete state.comments[cid]; upd['cards/'+cid] = null; upd['comments/'+cid] = null; }
   });
   delete state.columns[id];
   if (ui.quickAdd && ui.quickAdd.colId === id) ui.quickAdd = null;
   renderBoard();
+  syncWrite(upd);
+}
+function setColumnReminders(id, on){
+  const col = state.columns[id]; if (!col) return;
+  col.isReminders = on ? true : null;
+  renderBoard();
+  const upd = {}; upd['columns/'+id] = col;
   syncWrite(upd);
 }
 function moveColumnById(colId, newIndex){
@@ -1065,10 +1341,17 @@ function resetFilters(){
   ui.assignee = 'all'; ui.labels.clear();
   updateFilterUI(); renderBoard();
 }
+function commentCount(cardId){
+  const m = state.comments && state.comments[cardId];
+  return m ? Object.keys(m).length : 0;
+}
 function cardMatches(card){
   if (ui.search){
     const q = ui.search.toLowerCase();
-    if ((card.title + ' ' + card.description).toLowerCase().indexOf(q) < 0) return false;
+    let hay = card.title + ' ' + card.description;
+    const cmts = state.comments && state.comments[card.id];
+    if (cmts) hay += ' ' + Object.keys(cmts).map(function(k){ return cmts[k].text; }).join(' ');
+    if (hay.toLowerCase().indexOf(q) < 0) return false;
   }
   if (ui.assignee !== 'all'){
     const me = identityOf(); if (!me) return false;
@@ -1124,20 +1407,30 @@ function buildColumn(col){
     : String(cardsAll.length);
   const head = h('div', { class:'col-head' },
     h('span', { class:'col-grip', title:'Перетащите, чтобы передвинуть колонку', html:icon('grip',14) }),
-    h('span', { class:'col-title' }, h('span', { class:'col-name', title:col.title }, col.title)),
+    h('span', { class:'col-title' }, h('span', { class:'col-name', title:col.title },
+      col.isReminders ? h('span', { html:icon('bell',13), style:'color:var(--warn);margin-right:5px;display:inline-flex' }) : null,
+      col.title)),
     h('span', { class:'col-count' }, countTxt),
     h('button', { type:'button', class:'icon-btn col-menu-btn', title:'Меню колонки', html:icon('dots-h',16), style:'width:26px;height:26px' })
   );
   const list = h('div', { class:'col-cards', 'data-col':col.id });
   visible.forEach(function(c){ list.appendChild(buildCard(c)); });
   if (!visible.length){
-    list.appendChild(h('div', { class:'empty-col' }, filtersActive() ? 'Под фильтры ничего не подошло' : 'Перетащи карточку сюда'));
+    list.appendChild(h('div', { class:'empty-col' }, filtersActive() ? 'Под фильтры ничего не подошло' : (col.isReminders ? 'Добавьте первое напоминание' : 'Перетащи карточку сюда')));
   }
   el.append(head, list, buildQuickAdd(col.id));
   return el;
 }
 function buildCard(card){
   const el = h('div', { class:'card', 'data-card':card.id });
+  const isRem = card.type === 'reminder';
+  let lvl = 0;
+  if (isRem){
+    lvl = reminderUrgency(card.endAt);
+    el.classList.add('rem');
+    if (lvl) el.classList.add('urg-'+lvl);
+    el.dataset.remEnd = card.endAt || '';
+  }
   if (card.labels.length){
     el.appendChild(h('div', { class:'card-labels' },
       card.labels.map(function(l){ return h('span', { class:'lb', style:'background:'+LABELS[l].color, title:LABELS[l].name }); })
@@ -1145,40 +1438,55 @@ function buildCard(card){
   }
   el.appendChild(h('div', { class:'card-title' }, card.title));
   const row = h('div', { class:'card-meta' });
-  if (card.dueDate){
-    const today = todayStr();
-    row.appendChild(h('span', {
-      class:'due' + (card.dueDate < today ? ' overdue' : card.dueDate === today ? ' today' : ''),
-      html: icon('cal',12) + '<span>' + fmtDate(card.dueDate) + '</span>'
-    }));
-  }
-  if (card.priority){
-    row.appendChild(h('span', {
-      class:'meta-it prio-flag', title:'Приоритет: ' + PRIORITY[card.priority].name,
-      html: '<svg class="ic" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="'+PRIORITY[card.priority].color+'" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">'+I.flag+'</svg>'
-    }));
-  }
-  const sched = scheduleText(card);
-  if (sched){
-    const over = card.endAt && card.endAt < nowLocalIso();
-    row.appendChild(h('span', {
-      class:'due' + (over ? ' overdue' : ''), title:'Запланировано',
-      html: icon('clock',12) + '<span>' + sched + '</span>'
-    }));
-  }
-  if (card.cost){
-    row.appendChild(h('span', {
-      class:'due cost' + (card.paidEntryId ? ' paid' : ''),
-      title: card.paidEntryId ? 'Оплачено из копилки' : 'Стоимость',
-      html: (card.paidEntryId ? icon('check',11) : '') + '<span>' + fmtMoneyRu(card.cost) + '</span>'
-    }));
-  }
-  if (card.checklist.length){
-    const done = card.checklist.filter(function(i){ return i.done; }).length;
-    row.appendChild(h('span', {
-      class:'meta-it' + (done === card.checklist.length ? ' alldone' : ''),
-      html: icon('checksq',13) + '<span>' + done + '/' + card.checklist.length + '</span>'
-    }));
+  if (isRem){
+    if (card.endAt){
+      row.appendChild(h('span', { class:'due cd'+(lvl ? ' u'+lvl : ''), 'data-cd':'', title:'Дедлайн напоминания' },
+        h('span', { html:icon('clock',12) }),
+        h('span', { 'data-cdtext':'' }, countdownText(card.endAt))
+      ));
+    } else {
+      row.appendChild(h('span', { class:'due', title:'Без дедлайна', html:icon('bell',12)+'<span>без срока</span>' }));
+    }
+  } else {
+    if (card.dueDate){
+      const today = todayStr();
+      row.appendChild(h('span', {
+        class:'due' + (card.dueDate < today ? ' overdue' : card.dueDate === today ? ' today' : ''),
+        html: icon('cal',12) + '<span>' + fmtDate(card.dueDate) + '</span>'
+      }));
+    }
+    if (card.priority){
+      row.appendChild(h('span', {
+        class:'meta-it prio-flag', title:'Приоритет: ' + PRIORITY[card.priority].name,
+        html: '<svg class="ic" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="'+PRIORITY[card.priority].color+'" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">'+I.flag+'</svg>'
+      }));
+    }
+    const sched = scheduleText(card);
+    if (sched){
+      const over = card.endAt && card.endAt < nowLocalIso();
+      row.appendChild(h('span', {
+        class:'due' + (over ? ' overdue' : ''), title:'Запланировано',
+        html: icon('clock',12) + '<span>' + sched + '</span>'
+      }));
+    }
+    if (card.cost){
+      row.appendChild(h('span', {
+        class:'due cost' + (card.paidEntryId ? ' paid' : ''),
+        title: card.paidEntryId ? 'Оплачено из копилки' : 'Стоимость',
+        html: (card.paidEntryId ? icon('check',11) : '') + '<span>' + fmtMoneyRu(card.cost) + '</span>'
+      }));
+    }
+    if (card.checklist.length){
+      const done = card.checklist.filter(function(i){ return i.done; }).length;
+      row.appendChild(h('span', {
+        class:'meta-it' + (done === card.checklist.length ? ' alldone' : ''),
+        html: icon('checksq',13) + '<span>' + done + '/' + card.checklist.length + '</span>'
+      }));
+    }
+    const nc = commentCount(card.id);
+    if (nc){
+      row.appendChild(h('span', { class:'meta-it', title:'Комментарии: '+nc, html:icon('chat',13)+'<span>'+nc+'</span>' }));
+    }
   }
   if (card.description) row.appendChild(h('span', { class:'meta-it', html:icon('text',13), title:'Есть описание' }));
   if (card.assignee){ row.appendChild(h('span', { class:'meta-spacer' })); row.appendChild(avatarEl(card.assignee)); }
@@ -1199,13 +1507,14 @@ function avatarEl(kind){
 /* ═══════════ Быстрое добавление карточек ═══════════ */
 function buildQuickAdd(colId){
   const wrapEl = h('div', { class:'qa', 'data-qa':colId });
+  const isRem = !!(state.columns[colId] && state.columns[colId].isReminders);
   const open = ui.quickAdd && ui.quickAdd.colId === colId;
   if (!open){
-    wrapEl.appendChild(h('button', { type:'button', class:'qa-btn', html:icon('plus',15)+'<span>Добавить карточку</span>' }));
+    wrapEl.appendChild(h('button', { type:'button', class:'qa-btn', html:icon('plus',15)+'<span>'+(isRem ? 'Добавить напоминание' : 'Добавить карточку')+'</span>' }));
     return wrapEl;
   }
   const form = h('form', { class:'qa-form' });
-  const ta = h('textarea', { placeholder:'Название карточки… (Enter — добавить)' });
+  const ta = h('textarea', { placeholder: isRem ? 'Что напомнить? (Enter — добавить)' : 'Название карточки… (Enter — добавить)' });
   ta.value = ui.quickAdd.text || '';
   const closeBtn = h('button', { type:'button', class:'icon-btn', html:icon('x',15), title:'Отмена (Esc)' });
   form.append(
@@ -1347,6 +1656,8 @@ function openColumnMenu(btn){
   swatches.appendChild(none);
   openMenu(btn, [
     { label:'Переименовать', ic:'edit', onClick:function(){ closeMenu(); startColumnRename(colId); } },
+    { label: col.isReminders ? 'Обычная колонка' : 'Колонка напоминаний', ic:'bell',
+      onClick:function(){ closeMenu(); setColumnReminders(colId, !col.isReminders); } },
     { custom: h('div', { class:'menu-cap' }, 'Цвет метки колонки') },
     { custom: swatches },
     { sep:true },
@@ -1659,6 +1970,9 @@ function cancelDrag(ctx){
 function openCardModal(id){
   const card = state.cards[id]; if (!card) return;
   cm = { cardId:id, labels:card.labels.slice(), assignee:card.assignee, priority:card.priority||null, dirty:false };
+  const isRem = card.type === 'reminder';
+  $('#cardModal').classList.toggle('reminder-mode', isRem);
+  $('#cmEndLabel').textContent = isRem ? 'Дедлайн' : 'Конец';
   $('#cmTitle').value = card.title;
   $('#cmDesc').value = card.description || '';
   $('#cmDue').value = card.dueDate || '';
@@ -1671,7 +1985,9 @@ function openCardModal(id){
   delBtn.classList.remove('armed');
   delBtn.innerHTML = icon('trash',15) + '<span>Удалить</span>';
   hideAddCheckInput();
-  renderCmLabels(); renderCmAssignee(); renderCmChecklist(); renderCmPriority(); renderCmPay();
+  $('#cmCommText').value = '';
+  updateCommAuthor();
+  renderCmLabels(); renderCmAssignee(); renderCmChecklist(); renderCmPriority(); renderCmPay(); renderCmComments();
   $('#cardModal').classList.remove('hidden');
   if (!card.title) setTimeout(function(){ $('#cmTitle').focus(); }, 60);
 }
@@ -1915,7 +2231,7 @@ function syncModalWithRemote(){
   cm.labels = card.labels.slice();
   cm.assignee = card.assignee;
   cm.priority = card.priority || null;
-  renderCmLabels(); renderCmAssignee(); renderCmChecklist(); renderCmPriority(); renderCmPay();
+  renderCmLabels(); renderCmAssignee(); renderCmChecklist(); renderCmPriority(); renderCmPay(); renderCmComments();
 }
 function bindCardModal(){
   $('#cmTitle').addEventListener('input', function(){ if (cm) cm.dirty = true; });
@@ -1942,7 +2258,16 @@ function bindCardModal(){
       if (cm) cm.dirty = true;
     });
   });
-  $('#cmEndClear').addEventListener('click', function(){ $('#cmEnd').value = ''; if (cm) cm.dirty = true; });
+  $$('#cardModal [data-endclear]').forEach(function(b){
+    b.addEventListener('click', function(){ $('#cmEnd').value = ''; if (cm) cm.dirty = true; });
+  });
+  $$('#cardModal [data-endd]').forEach(function(b){
+    b.addEventListener('click', function(){
+      const cur = $('#cmEnd').value;
+      $('#cmEnd').value = dateStrOffset(Number(b.dataset.endd)) + 'T' + (cur ? cur.slice(11,16) : '18:00');
+      if (cm) cm.dirty = true;
+    });
+  });
   $$('#cardModal [data-due]').forEach(function(b){
     b.addEventListener('click', function(){
       $('#cmDue').value = dateStrOffset(Number(b.dataset.due));
@@ -1974,6 +2299,16 @@ function bindCardModal(){
     if (ev.key === 'Escape'){ hideAddCheckInput(); }
   });
   $('#cmAddCheckInput').addEventListener('blur', function(){ setTimeout(hideAddCheckInput, 140); });
+  $('#cmCommSend').addEventListener('click', addComment);
+  $('#cmCommText').addEventListener('keydown', function(e){
+    if (e.key === 'Enter' && !e.shiftKey){ e.preventDefault(); addComment(); }
+  });
+  $('#cmCommAv').addEventListener('click', function(){
+    const next = commentAuthor() === 'husband' ? 'wife' : 'husband';
+    ui.identity = next;
+    try { localStorage.setItem(LS.id, next); } catch(e){}
+    updateFilterUI(); updateCommAuthor(); renderCmComments();
+  });
   $('#cmSave').addEventListener('click', function(){
     if (saveCardModal()){ if (cm) cm.dirty = false; flashSaved(); }
     else closeCardModal();
@@ -1999,7 +2334,83 @@ function bindCardModal(){
   $('#cardModal').addEventListener('pointerdown', function(e){ if (e.target === $('#cardModal')) closeCardModal(); });
 }
 
+/* ═══════════ Комментарии в карточке ═══════════ */
+function commentAuthor(){ return identityOf() || 'husband'; }
+function updateCommAuthor(){
+  const a = commentAuthor();
+  const b = $('#cmCommAv'); if (!b) return;
+  b.className = 'comm-av avatar ' + a;
+  const nm = a === 'husband' ? meta().husbandName : meta().wifeName;
+  b.textContent = (nm.trim()[0] || '?').toUpperCase();
+  b.title = 'Пишет: ' + nm + ' (нажмите, чтобы сменить)';
+}
+function renderCmComments(){
+  if (!cm) return;
+  const box = $('#cmComments'); if (!box) return;
+  const map = (state.comments && state.comments[cm.cardId]) || {};
+  const list = Object.values(map).sort(function(a,b){ return (a.createdAt||0) - (b.createdAt||0); });
+  $('#cmCommCount').textContent = list.length ? '  ' + list.length : '';
+  box.innerHTML = '';
+  const me = identityOf();
+  if (!list.length){
+    box.appendChild(h('div', { class:'comm-empty' }, 'Комментариев пока нет — обсудите задачу здесь'));
+  }
+  list.forEach(function(m){
+    const nm = m.author === 'wife' ? meta().wifeName : meta().husbandName;
+    const row = h('div', { class:'comment' },
+      h('span', { class:'avatar ' + (m.author === 'wife' ? 'wife' : 'husband') }, (nm.trim()[0] || '?').toUpperCase()),
+      h('div', { class:'comment-body' },
+        h('div', { class:'comment-head' }, h('b', {}, nm), h('time', {}, fmtFull(m.createdAt))),
+        h('div', { class:'comment-text' }, m.text)
+      ),
+      (me && m.author === me) ? h('button', { type:'button', class:'icon-btn', title:'Удалить', html:icon('x',13) }) : null
+    );
+    const del = row.querySelector('button');
+    if (del) del.addEventListener('click', function(){ deleteComment(m.id); });
+    box.appendChild(row);
+  });
+  box.scrollTop = box.scrollHeight;
+}
+function addComment(){
+  if (!cm) return;
+  const inp = $('#cmCommText');
+  const text = inp.value.trim();
+  if (!text) return;
+  const id = uid('cmt');
+  const cmt = { id:id, author:commentAuthor(), text:text.slice(0,1000), createdAt:Date.now() };
+  if (!state.comments[cm.cardId]) state.comments[cm.cardId] = {};
+  state.comments[cm.cardId][id] = cmt;
+  renderCmComments();
+  inp.value = ''; inp.focus();
+  const upd = {}; upd['comments/' + cm.cardId + '/' + id] = { author:cmt.author, text:cmt.text, createdAt:cmt.createdAt };
+  syncWrite(upd);
+  renderBoard();
+}
+function deleteComment(id){
+  if (!cm) return;
+  const map = state.comments[cm.cardId];
+  if (map && map[id]){ delete map[id]; renderCmComments(); }
+  const upd = {}; upd['comments/' + cm.cardId + '/' + id] = null;
+  syncWrite(upd);
+  renderBoard();
+}
+
 /* ═══════════ Копилка: данные ═══════════ */
+function finTotalSum(){
+  let t = 0;
+  Object.keys(finEntries).forEach(function(id){ t += Number((finEntries[id] || {}).amount) || 0; });
+  return t;
+}
+/* сумма копилки на вкладке-кнопке — видна и из режима доски */
+function updateFinTabSum(){
+  const el = $('#finTabSum'); if (!el) return;
+  if (!finRoom()){ el.textContent = ''; return; }
+  el.textContent = fmtMoneyRu(finTotalSum());
+}
+function finChanged(){
+  if (ui.view === 'finance') renderFinance();
+  updateFinTabSum();
+}
 function saveFinLocal(){ try { localStorage.setItem(LS.fin, JSON.stringify(finEntries)); } catch(e){} }
 function finSubscribe(){
   if (finUnsub){ finUnsub(); finUnsub = null; }
@@ -2008,14 +2419,14 @@ function finSubscribe(){
   if (!room) return;
   if (fbMode && db){
     const r = db.ref('rooms/' + room + '/entries');
-    const cb = function(snap){ finEntries = snap.val() || {}; if (ui.view === 'finance') renderFinance(); };
+    const cb = function(snap){ finEntries = snap.val() || {}; finChanged(); };
     const errCb = function(err){ console.warn('Finance FB:', err); };
     r.on('value', cb, errCb);
     finUnsub = function(){ r.off('value', cb); };
   } else if (!dbUrl()){
     try { finEntries = JSON.parse(localStorage.getItem(LS.fin) || '{}'); } catch(e){ finEntries = {}; }
   }
-  if (ui.view === 'finance') renderFinance();
+  finChanged();
 }
 function finAddEntry(entry, cb){
   const room = finRoom();
@@ -2030,7 +2441,7 @@ function finAddEntry(entry, cb){
     const id = uid('fin');
     finEntries[id] = entry;
     saveFinLocal();
-    if (ui.view === 'finance') renderFinance();
+    finChanged();
     if (cb) cb(id);
   }
 }
@@ -2042,7 +2453,7 @@ function finRemoveEntry(id){
   } else {
     delete finEntries[id];
     saveFinLocal();
-    if (ui.view === 'finance') renderFinance();
+    finChanged();
   }
 }
 function finUpdateEntry(id, patch){
@@ -2052,7 +2463,7 @@ function finUpdateEntry(id, patch){
   } else if (finEntries[id]){
     Object.assign(finEntries[id], patch);
     saveFinLocal();
-    if (ui.view === 'finance') renderFinance();
+    finChanged();
   }
 }
 
@@ -2061,6 +2472,7 @@ function renderFinance(){
   const view = $('#financeView'); if (!view || !state) return;
   const room = finRoom();
   $('#finRoomCode').textContent = room || '—';
+  updateFinTabSum();
   const setup = $('#finSetup'), main = $('#finMain'), noteEl = $('#finLocalNote');
   if (!room){
     setup.classList.remove('hidden'); main.classList.add('hidden'); noteEl.classList.add('hidden');
@@ -2107,6 +2519,7 @@ function renderFinance(){
   $('#finWhoWifeAv').textContent = (meta().wifeName.trim()[0] || 'Ж').toUpperCase();
   $('#finWhoHusbandAv').textContent = (meta().husbandName.trim()[0] || 'М').toUpperCase();
   $('#finCount').textContent = ids.length + ' ' + plural(ids.length, 'операция','операции','операций');
+  updateFinTabSum();
   const list = $('#finList');
   if (!ids.length){
     list.innerHTML = '<div class="fin-empty">Пока пусто — отложите первые деньги или оплатите задачу из карточки</div>';
@@ -2384,9 +2797,31 @@ function enterApp(){
   $('#app').classList.remove('hidden');
   if (!state){ state = defaultState(); saveLocal(); }
   renderAll();
+  if (!dbUrl()) runMigrations(); // чисто локальный режим — миграции сразу
   initFirebase();
   finSubscribe();
   switchView(ui.view);
+  startReminderTicker();
+}
+/* Обновление обратного отсчёта и силы свечения напоминаний каждые 30 секунд
+   (без полной перерисовки — чтобы не мешать вводу текста и перетаскиванию) */
+function startReminderTicker(){
+  if (reminderTicker) return;
+  reminderTicker = setInterval(function(){
+    if (!state || ui.view !== 'board') return;
+    $$('.card.rem').forEach(function(el){
+      const endAt = el.dataset.remEnd || '';
+      const lvl = reminderUrgency(endAt);
+      for (let i = 1; i <= 5; i++) el.classList.toggle('urg-'+i, i === lvl);
+      const chip = el.querySelector('[data-cd]');
+      if (chip){
+        chip.classList.remove('u1','u2','u3','u4','u5');
+        if (lvl) chip.classList.add('u'+lvl);
+        const tx = chip.querySelector('[data-cdtext]');
+        if (tx) tx.textContent = countdownText(endAt);
+      }
+    });
+  }, 30000);
 }
 function bindLogin(){
   $('#loginForm').addEventListener('submit', function(e){
