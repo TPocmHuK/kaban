@@ -1,0 +1,2465 @@
+<!DOCTYPE html>
+<html lang="ru" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#ffffff">
+<title>Наша доска</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect x='3' y='3' width='5' height='13' rx='1.5' fill='%232383e2'/%3E%3Crect x='9.5' y='3' width='5' height='9' rx='1.5' fill='%239b9a97'/%3E%3Crect x='16' y='3' width='5' height='17' rx='1.5' fill='%23d64c93'/%3E%3C/svg%3E">
+<!--
+═══════════════════════════════════════════════════════════════════
+НАША ДОСКА — канбан-доска для двоих (один файл, без сборки)
+
+БЫСТРЫЙ СТАРТ:
+1. ПАРОЛЬ: строка  APP_PASSWORD  в начале скрипта (по умолчанию family2025)
+2. СИНХРОНИЗАЦИЯ: уже настроена — в FIREBASE_CONFIG вписана ваша база из копилки (nasha-kopilka).
+   Доска хранится в rooms/our-board-2025/board, копилка — в rooms/{код комнаты}/entries
+   (полностью совместимо со старым приложением «Наша копилка» — код комнаты тот же).
+3. ЗАЛИТЬ НА ХОСТИНГ: GitHub Pages / Netlify Drop / любой хостинг статики.
+4. Откройте ссылку, введите пароль и отправьте её партнёру — доска общая.
+
+ЧТО ВНУТРИ: канбан-доска + вкладка «Копилка» (отложить/снять, история, итоги),
+у задач: приоритет, начало/конец (дата и время), дедлайн, стоимость в ₽
+и списание стоимости из копилки одним нажатием.
+═══════════════════════════════════════════════════════════════════
+-->
+<style>
+/* ═══════════ Базовые переменные (светлая тема — Notion) ═══════════ */
+:root{
+  color-scheme:light;
+  --bg:#ffffff; --bg-out:#f7f7f5; --col-bg:#f7f7f5; --card-bg:#ffffff;
+  --text:#37352f; --text-2:#787774; --text-3:#9b9a97;
+  --border:#ebebea; --border-2:#d3d1cb; --hover:#f1f1ef; --btn-hover:#efefef;
+  --accent:#2383e2; --accent-soft:rgba(35,131,226,.12);
+  --danger:#e03e3e; --danger-soft:rgba(224,62,62,.1);
+  --ok:#23a55a; --warn:#d9730d;
+  --shadow-1:0 1px 2px rgba(15,15,15,.04), 0 0 0 1px rgba(15,15,15,.045);
+  --shadow-2:0 3px 8px rgba(15,15,15,.08), 0 0 0 1px rgba(15,15,15,.05);
+  --shadow-modal:0 12px 40px rgba(15,15,15,.18), 0 0 0 1px rgba(15,15,15,.05);
+}
+html[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#191919; --bg-out:#191919; --col-bg:#202020; --card-bg:#2f2f2f;
+  --text:#e9e9e7; --text-2:#a5a4a1; --text-3:#82817e;
+  --border:#333330; --border-2:#404040; --hover:#2a2a2a; --btn-hover:#333333;
+  --accent:#4f9dd6; --accent-soft:rgba(79,157,214,.16);
+  --danger:#ff7369; --danger-soft:rgba(255,115,105,.14);
+  --ok:#3fb968; --warn:#e0a030;
+  --shadow-1:0 1px 2px rgba(0,0,0,.25), 0 0 0 1px rgba(255,255,255,.045);
+  --shadow-2:0 3px 10px rgba(0,0,0,.35), 0 0 0 1px rgba(255,255,255,.05);
+  --shadow-modal:0 12px 40px rgba(0,0,0,.5), 0 0 0 1px rgba(255,255,255,.06);
+}
+
+/* ═══════════ База ═══════════ */
+*{box-sizing:border-box; margin:0; padding:0}
+html,body{height:100%}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans',sans-serif;
+  background:var(--bg-out); color:var(--text); font-size:14px; line-height:1.5;
+  -webkit-font-smoothing:antialiased; overflow:hidden;
+}
+button{font:inherit; color:inherit; background:none; border:none; cursor:pointer}
+input,textarea{font:inherit; color:var(--text)}
+ul{list-style:none}
+.hidden{display:none!important}
+.ic{display:inline-block; vertical-align:-2px; flex-shrink:0}
+::selection{background:rgba(35,131,226,.25)}
+
+/* Скроллбары */
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-thumb{background:var(--border-2);border-radius:6px;border:3px solid transparent;background-clip:content-box}
+::-webkit-scrollbar-thumb:hover{background:var(--text-3);border:3px solid transparent;background-clip:content-box}
+::-webkit-scrollbar-track{background:transparent}
+*{scrollbar-width:thin; scrollbar-color:var(--border-2) transparent}
+
+/* ═══════════ Каркас ═══════════ */
+.app{display:flex; flex-direction:column; height:100vh; height:100dvh}
+.topbar{
+  display:flex; align-items:center; gap:8px; flex-wrap:wrap;
+  padding:8px 14px; background:var(--bg); border-bottom:1px solid var(--border);
+  position:relative; z-index:40; flex-shrink:0;
+}
+.tb-left{display:flex; align-items:center; gap:8px; min-width:0}
+.brand-ico{width:24px;height:24px;border-radius:6px;background:var(--accent);color:#fff;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0}
+.board-title{font-weight:600; font-size:15px; cursor:text; padding:3px 8px; border-radius:6px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:260px}
+.board-title:hover{background:var(--hover)}
+.tb-title-inp{width:200px; height:28px}
+.tb-center{display:flex; align-items:center; gap:8px; flex-wrap:wrap}
+.tb-right{display:flex; align-items:center; gap:4px; margin-left:auto}
+
+/* ═══════════ Доска и колонки ═══════════ */
+.board{flex:1; min-height:0; padding:14px 16px}
+.columns{
+  display:flex; gap:12px; align-items:stretch; height:100%;
+  overflow-x:auto; overflow-y:hidden; padding:2px 2px 10px;
+}
+.column{
+  flex:0 0 292px; width:292px; display:flex; flex-direction:column; min-height:0;
+  background:var(--col-bg); border-radius:12px; border-top:4px solid transparent;
+  box-shadow:var(--shadow-1); transition:box-shadow .15s ease-out, background .15s ease-out;
+}
+.column.drag-over{box-shadow:inset 0 0 0 2px var(--accent), var(--shadow-1); background:var(--hover)}
+.col-head{display:flex; align-items:center; gap:4px; padding:8px 10px 6px; flex-shrink:0}
+.col-grip{
+  opacity:0; cursor:grab; color:var(--text-3); width:22px; height:26px; border-radius:6px;
+  display:flex; align-items:center; justify-content:center; flex-shrink:0; touch-action:none;
+}
+.column:hover .col-grip{opacity:.75}
+.col-grip:hover{background:var(--btn-hover); opacity:1}
+.col-title{font-weight:600; font-size:14px; flex:1; display:flex; align-items:center; min-width:0; cursor:default}
+.col-name{white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding:2px 4px; border-radius:4px}
+.col-count{color:var(--text-3); font-size:12px; background:rgba(15,15,15,.05); border-radius:10px; padding:1px 8px; flex-shrink:0}
+html[data-theme="dark"] .col-count{background:rgba(255,255,255,.07)}
+.col-cards{flex:1 1 0; min-height:44px; overflow-y:auto; padding:2px 8px 6px; display:flex; flex-direction:column; gap:8px}
+.empty-col{border:1.5px dashed var(--border-2); border-radius:8px; padding:16px 10px; text-align:center; color:var(--text-3); font-size:13px}
+
+/* ═══════════ Карточка ═══════════ */
+.card{
+  position:relative; background:var(--card-bg); border-radius:8px; padding:10px 12px;
+  box-shadow:var(--shadow-1); cursor:grab; flex-shrink:0;
+  transition:box-shadow .15s ease-out;
+}
+.card:hover{box-shadow:var(--shadow-2)}
+.card-labels{display:flex; gap:4px; margin-bottom:7px}
+.lb{width:30px; height:7px; border-radius:4px}
+.card-title{font-size:14px; font-weight:500; word-break:break-word; padding-right:16px; white-space:pre-wrap}
+.card-meta{display:flex; align-items:center; gap:9px; margin-top:8px; color:var(--text-3); font-size:12px; min-height:18px}
+.meta-it{display:inline-flex; align-items:center; gap:4px}
+.meta-it.alldone{color:var(--ok)}
+.meta-spacer{flex:1}
+.due{display:inline-flex; align-items:center; gap:4px; padding:1px 6px; border-radius:4px; background:rgba(15,15,15,.05); color:var(--text-2)}
+html[data-theme="dark"] .due{background:rgba(255,255,255,.07)}
+.due.overdue{color:var(--danger); background:var(--danger-soft); font-weight:500}
+.due.today{color:var(--warn); background:rgba(217,115,13,.12)}
+.avatar{width:20px; height:20px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; font-size:10px; font-weight:700; color:#fff; flex-shrink:0}
+.avatar.husband{background:#2383e2}
+.avatar.wife{background:#d64c93}
+.avatar-pair{display:inline-flex}
+.avatar-pair .avatar{box-shadow:0 0 0 2px var(--card-bg)}
+.avatar-pair .avatar + .avatar{margin-left:-7px}
+.card-menu-btn{
+  position:absolute; top:5px; right:5px; width:24px; height:24px; border-radius:6px;
+  display:none; align-items:center; justify-content:center; color:var(--text-3); background:var(--card-bg);
+}
+.card:hover .card-menu-btn{display:flex}
+.card-menu-btn:hover{background:var(--btn-hover); color:var(--text)}
+.card-enter{animation:cardIn .2s ease-out}
+@keyframes cardIn{from{opacity:0; transform:translateY(-4px) scale(.98)}}
+.card.drop-in{animation:dropIn .18s ease-out}
+@keyframes dropIn{from{transform:scale(.97)}}
+
+/* ═══════════ Быстрое добавление ═══════════ */
+.qa{padding:2px 8px 10px; flex-shrink:0}
+.qa-btn{display:flex; align-items:center; gap:6px; width:100%; padding:7px 8px; border-radius:8px; color:var(--text-3); font-size:14px}
+.qa-btn:hover{background:var(--btn-hover); color:var(--text-2)}
+.qa-form{background:var(--card-bg); border-radius:8px; box-shadow:var(--shadow-2); padding:8px}
+.qa-form textarea{width:100%; border:none; outline:none; resize:none; background:transparent; min-height:36px; max-height:140px; overflow:hidden}
+.qa-actions{display:flex; gap:6px; margin-top:4px; align-items:center}
+
+/* ═══════════ Новая колонка ═══════════ */
+.add-col{flex:0 0 280px; width:280px; align-self:flex-start; min-height:76px; border:1.5px dashed var(--border-2); border-radius:12px; display:flex; align-items:center; justify-content:center}
+.add-col:hover{background:var(--hover)}
+.add-col-btn{display:flex; align-items:center; gap:7px; color:var(--text-3); font-size:14px; padding:12px 24px}
+.add-col-btn:hover{color:var(--text-2)}
+.add-col-form{flex:0 0 280px; width:280px; align-self:flex-start; padding:8px; background:var(--col-bg); border-radius:12px; box-shadow:var(--shadow-1)}
+
+/* ═══════════ Кнопки и поля ═══════════ */
+.btn{display:inline-flex; align-items:center; justify-content:center; gap:6px; height:32px; padding:0 12px; border-radius:6px; font-size:14px; font-weight:500; transition:background .15s ease-out, color .15s ease-out; white-space:nowrap}
+.btn.primary{background:var(--accent); color:#fff}
+.btn.primary:hover{opacity:.92}
+.btn.ghost{color:var(--text-2)}
+.btn.ghost:hover{background:var(--btn-hover); color:var(--text)}
+.btn.danger-ghost{color:var(--danger)}
+.btn.danger-ghost:hover{background:var(--danger-soft)}
+.btn.danger-ghost.armed{background:var(--danger-soft); font-weight:600}
+.btn.wide{width:100%}
+.btn.sm{height:28px; padding:0 10px; font-size:13px}
+.icon-btn{width:30px; height:30px; border-radius:6px; display:inline-flex; align-items:center; justify-content:center; color:var(--text-2); flex-shrink:0}
+.icon-btn:hover{background:var(--btn-hover); color:var(--text)}
+.inp{height:32px; border:1px solid var(--border-2); border-radius:6px; padding:0 10px; outline:none; background:var(--bg); width:100%; transition:border-color .15s, box-shadow .15s}
+.inp:focus{border-color:var(--accent); box-shadow:0 0 0 2px var(--accent-soft)}
+textarea.inp{height:auto; padding:8px 10px; resize:vertical}
+
+/* ═══════════ Поиск / сегменты / фильтры ═══════════ */
+.search-wrap{display:flex; align-items:center; gap:6px; background:var(--hover); border-radius:6px; padding:0 4px 0 9px; height:32px; width:220px; color:var(--text-3); transition:box-shadow .15s, background .15s}
+.search-wrap:focus-within{box-shadow:0 0 0 2px var(--accent-soft); background:var(--bg)}
+.search-wrap input{flex:1; border:none; outline:none; background:transparent; min-width:0; color:var(--text)}
+.seg{display:flex; background:var(--hover); border-radius:6px; padding:2px; gap:2px}
+.seg button{display:inline-flex; align-items:center; gap:6px; height:28px; padding:0 11px; border-radius:5px; color:var(--text-2); font-size:13px; transition:background .15s}
+.seg button:hover{color:var(--text)}
+.seg button.active{background:var(--card-bg); box-shadow:var(--shadow-1); color:var(--text); font-weight:500}
+
+/* ═══════════ Индикатор синхронизации ═══════════ */
+.sync{display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text-2); padding:0 6px; white-space:nowrap}
+.sync-dot{width:8px; height:8px; border-radius:50%; background:var(--text-3); flex-shrink:0}
+.sync.ok .sync-dot{background:var(--ok)}
+.sync.err .sync-dot{background:var(--danger)}
+.sync.wait .sync-dot{background:var(--text-3); animation:pulse 1.2s infinite}
+.sync.local .sync-dot{background:var(--warn)}
+@keyframes pulse{50%{opacity:.3}}
+
+/* Баннер локального режима */
+.mode-banner{display:flex; align-items:center; gap:8px; margin:10px 16px 0; padding:8px 8px 8px 12px; border-radius:8px; background:#fbf3db; color:#644b1f; font-size:13px; flex-shrink:0}
+html[data-theme="dark"] .mode-banner{background:rgba(217,179,13,.14); color:#e5c46b}
+.mode-banner button{margin-left:auto; color:inherit; opacity:.65}
+.mode-banner button:hover{opacity:1}
+
+/* ═══════════ Оверлеи и модалки ═══════════ */
+.overlay{
+  position:fixed; inset:0; background:rgba(15,15,15,.46);
+  -webkit-backdrop-filter:blur(4px); backdrop-filter:blur(4px);
+  display:flex; align-items:center; justify-content:center; z-index:100; padding:20px;
+  animation:fadeIn .15s ease-out;
+}
+@keyframes fadeIn{from{opacity:0}}
+.modal{
+  background:var(--card-bg); border-radius:12px; box-shadow:var(--shadow-modal);
+  width:min(720px,100%); max-height:calc(100vh - 56px); max-height:calc(100dvh - 56px);
+  display:flex; flex-direction:column; position:relative; animation:popIn .18s ease-out;
+}
+@keyframes popIn{from{opacity:0; transform:translateY(10px) scale(.98)}}
+.modal-x{position:absolute; top:10px; right:10px; z-index:2}
+.modal-body{padding:18px 20px; overflow-y:auto}
+.modal-foot{display:flex; align-items:center; gap:10px; padding:12px 20px; border-top:1px solid var(--border); flex-shrink:0}
+.modal-h{font-size:18px; margin-bottom:8px; padding-right:34px}
+.fld{display:block; font-size:12px; font-weight:600; color:var(--text-2); margin:14px 0 6px}
+.fld:first-child{margin-top:0}
+.fld-hint{font-weight:400; color:var(--text-3)}
+.fld-note{font-size:12px; color:var(--text-3); margin:4px 0 0}
+.saved-note{font-size:12px; color:var(--ok); opacity:0; transition:opacity .2s}
+.saved-note.show{opacity:1}
+
+/* ═══════════ Модалка карточки ═══════════ */
+.cm-title{width:100%; border:none; outline:none; font-size:20px; font-weight:700; background:transparent; padding:4px 0 6px; border-bottom:1px solid transparent; transition:border-color .15s}
+.cm-title:focus{border-bottom-color:var(--border)}
+.cm-grid{display:grid; grid-template-columns:1fr 240px; gap:22px; margin-top:12px}
+.cm-desc{width:100%; min-height:96px; resize:vertical; border:1px solid var(--border-2); border-radius:8px; padding:8px 10px; outline:none; background:var(--bg); transition:border-color .15s, box-shadow .15s}
+.cm-desc:focus{border-color:var(--accent); box-shadow:0 0 0 2px var(--accent-soft)}
+.chips{display:flex; flex-wrap:wrap; gap:6px}
+.chip{display:inline-flex; align-items:center; gap:6px; height:28px; padding:0 10px; border-radius:6px; border:1px solid var(--border-2); font-size:13px; color:var(--text-2); transition:background .15s, border-color .15s}
+.chip:hover{background:var(--hover)}
+.chip .dot{width:10px; height:10px; border-radius:50%}
+.chip.sel{border-color:var(--text); color:var(--text); background:var(--hover); font-weight:500}
+.chip.shake{animation:shakeX .3s}
+@keyframes shakeX{25%{transform:translateX(-3px)}75%{transform:translateX(3px)}}
+.asg-grid{display:grid; grid-template-columns:1fr 1fr; gap:6px}
+.asg-opt{display:flex; align-items:center; gap:8px; height:34px; padding:0 9px; border:1px solid var(--border-2); border-radius:8px; font-size:13px; color:var(--text-2); transition:background .15s, border-color .15s; text-align:left; min-width:0}
+.asg-opt span{white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.asg-opt:hover{background:var(--hover)}
+.asg-opt.sel{border-color:var(--accent); background:var(--accent-soft); color:var(--text); font-weight:500}
+.date-btns{display:flex; gap:6px; flex-wrap:wrap; margin-top:6px}
+.cm-created{font-size:13px; color:var(--text-2); padding:2px 0}
+
+/* Чек-лист */
+.progress{height:4px; border-radius:2px; background:var(--hover); overflow:hidden; margin:4px 0 6px}
+.progress i{display:block; height:100%; background:var(--ok); transition:width .2s ease-out}
+.check-item{display:flex; align-items:flex-start; gap:8px; padding:4px 4px 4px 2px; border-radius:6px}
+.check-item:hover{background:var(--hover)}
+.custom-cb{width:16px; height:16px; border:1.5px solid var(--border-2); border-radius:4px; display:flex; align-items:center; justify-content:center; color:transparent; flex-shrink:0; margin-top:3px; cursor:pointer; background:var(--bg); transition:background .12s, border-color .12s}
+.custom-cb:hover{border-color:var(--text-3)}
+.check-item.done .custom-cb{background:var(--accent); border-color:var(--accent); color:#fff}
+.ci-text{flex:1; word-break:break-word; cursor:text; padding:1px 0}
+.ci-text.done{color:var(--text-3); text-decoration:line-through}
+.check-item .icon-btn{opacity:0; width:24px; height:24px}
+.check-item:hover .icon-btn{opacity:1}
+.ci-inp{height:28px; padding:0 8px}
+#cmAddCheckInput{margin-top:4px}
+
+/* ═══════════ Контекстные меню ═══════════ */
+.menu{position:fixed; z-index:150; min-width:210px; background:var(--card-bg); border-radius:10px; box-shadow:var(--shadow-modal); padding:6px; animation:popIn .12s ease-out}
+.menu-it{display:flex; align-items:center; gap:9px; width:100%; padding:7px 10px; border-radius:6px; font-size:14px; text-align:left; color:var(--text)}
+.menu-it:hover{background:var(--hover)}
+.menu-it.danger{color:var(--danger)}
+.menu-it.danger:hover{background:var(--danger-soft)}
+.menu-it.armed{background:var(--danger-soft); font-weight:600}
+.menu-sep{height:1px; background:var(--border); margin:6px 4px}
+.menu-cap{font-size:11px; font-weight:600; color:var(--text-3); padding:6px 10px 2px; text-transform:uppercase; letter-spacing:.04em}
+.swatches{display:flex; gap:7px; padding:4px 10px 8px; flex-wrap:wrap}
+.swatch{width:22px; height:22px; border-radius:50%; border:2px solid transparent; display:flex; align-items:center; justify-content:center; color:#fff; transition:transform .12s}
+.swatch:hover{transform:scale(1.12)}
+.swatch.sel{border-color:var(--text); box-shadow:0 0 0 2px var(--card-bg) inset}
+.swatch.none{border:1.5px dashed var(--border-2); color:var(--text-3); background:transparent}
+.menu .dot{width:12px; height:12px; border-radius:50%; flex-shrink:0}
+
+/* ═══════════ Drag & Drop ═══════════ */
+body.dragging-active{cursor:grabbing; user-select:none; -webkit-user-select:none}
+.drag-ghost{position:fixed; z-index:200; pointer-events:none; margin:0; transform:scale(1.02) rotate(.6deg); box-shadow:0 16px 40px rgba(15,15,15,.22), var(--shadow-1); opacity:.97}
+.drag-ghost-col{position:fixed; z-index:200; pointer-events:none; opacity:.96; transform:scale(1.01); box-shadow:var(--shadow-modal); overflow:hidden}
+.card.drag-origin{opacity:.35}
+.column.drag-origin{opacity:.4}
+.drop-placeholder{border:1.5px dashed var(--accent); background:var(--accent-soft); border-radius:8px; flex-shrink:0}
+.col-placeholder{border-radius:12px; background:var(--accent-soft); border:1.5px dashed var(--accent); flex-shrink:0}
+
+/* ═══════════ Экран входа ═══════════ */
+.login-wrap{position:fixed; inset:0; display:flex; align-items:center; justify-content:center; background:var(--bg-out); z-index:300; padding:16px}
+.login-card{width:min(360px,94vw); background:var(--card-bg); border-radius:14px; box-shadow:var(--shadow-modal); padding:34px 30px; text-align:center; animation:popIn .25s ease-out}
+.login-ico{width:52px; height:52px; border-radius:13px; background:var(--accent); color:#fff; display:inline-flex; align-items:center; justify-content:center; margin-bottom:14px}
+.login-card h1{font-size:22px; margin-bottom:4px; letter-spacing:-.01em}
+.login-sub{color:var(--text-2); font-size:13px; margin-bottom:22px}
+.login-card .inp{margin-bottom:10px; text-align:center; height:38px}
+.login-err{color:var(--danger); font-size:13px; margin-bottom:8px}
+.login-hint{color:var(--text-3); font-size:12px; margin-top:16px; line-height:1.55}
+.shake{animation:shakeBig .35s}
+@keyframes shakeBig{20%{transform:translateX(-7px)}40%{transform:translateX(6px)}60%{transform:translateX(-4px)}80%{transform:translateX(3px)}}
+
+/* ═══════════ Настройки ═══════════ */
+.st-names{display:grid; grid-template-columns:28px 1fr; gap:8px; align-items:center; max-width:320px}
+
+/* ═══════════ Приоритет / расписание / стоимость на карточке ═══════════ */
+.card-meta{flex-wrap:wrap; row-gap:4px}
+.prio-flag{display:inline-flex}
+.due.cost{font-variant-numeric:tabular-nums}
+.due.cost.paid{color:var(--ok); background:rgba(35,165,90,.13)}
+
+/* ═══════════ Оплата задачи из копилки (модалка) ═══════════ */
+.pay-btns{display:flex; gap:8px; flex-wrap:wrap; margin-top:8px}
+.pay-btns .btn .avatar{width:18px;height:18px;font-size:9px}
+.pay-done{display:inline-flex; align-items:center; gap:6px; color:var(--ok); font-weight:500; font-size:13px; background:rgba(35,165,90,.13); padding:5px 10px; border-radius:6px}
+.pay-room{display:flex; gap:8px; margin-top:6px}
+.pay-room .inp{height:30px; flex:1; min-width:0}
+
+/* ═══════════ Копилка (вкладка) ═══════════ */
+.finance{flex:1; min-height:0; overflow-y:auto}
+.fin-wrap{max-width:640px; margin:0 auto; padding:18px 16px 90px}
+.fin-card{background:var(--card-bg); border-radius:12px; box-shadow:var(--shadow-1); padding:16px 18px; margin-bottom:12px}
+.fin-room{display:flex; align-items:center; gap:10px; background:var(--card-bg); border-radius:999px; box-shadow:var(--shadow-1); padding:6px 6px 6px 14px; margin-bottom:12px; font-size:13px; color:var(--text-2)}
+.fin-room-code{font-weight:600; color:var(--text); font-family:ui-monospace,Menlo,Consolas,monospace; font-size:12px}
+.fin-room .btn{margin-left:auto}
+.fin-setup h2{font-size:17px; margin-bottom:2px}
+.fin-setup p{font-size:13.5px; color:var(--text-2); margin:6px 0 12px; line-height:1.55}
+.fin-total-label{font-size:11px; font-weight:600; color:var(--text-3); text-transform:uppercase; letter-spacing:.06em}
+.fin-total-value{font-size:34px; font-weight:700; letter-spacing:-.02em; margin:4px 0 12px; font-variant-numeric:tabular-nums}
+.fin-total-value.negative{color:var(--danger)}
+.fin-pills{display:flex; gap:8px; flex-wrap:wrap}
+.fin-pill{display:inline-flex; align-items:center; gap:7px; padding:3px 10px 3px 4px; border-radius:999px; background:var(--hover); font-size:13px}
+.fin-pill .avatar{width:20px;height:20px;font-size:10px}
+.fin-pill b{font-weight:600; font-variant-numeric:tabular-nums}
+.fin-planned{margin-top:12px; padding-top:12px; border-top:1px solid var(--border); font-size:13px; color:var(--text-2)}
+.fin-planned b{color:var(--text)}
+.fin-form-top{display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap; margin-bottom:10px}
+.fin-form-row{display:flex; gap:8px}
+.fin-form-row .inp.amt{flex:0 0 130px}
+.fin-form-row .inp.note{flex:1; min-width:0}
+.fin-list-head{display:flex; align-items:baseline; justify-content:space-between; margin:16px 2px 8px}
+.fin-list-head h2{font-size:15px; font-weight:600}
+.fin-count{font-size:12px; color:var(--text-3)}
+.fin-row{display:flex; align-items:flex-start; gap:10px; background:var(--card-bg); border-radius:10px; box-shadow:var(--shadow-1); padding:10px 12px; margin-bottom:8px}
+.fin-row .avatar{width:24px;height:24px;font-size:11px;margin-top:1px}
+.fin-amt{font-weight:600; font-variant-numeric:tabular-nums; white-space:nowrap; font-size:14px}
+.fin-amt.pos{color:var(--ok)}
+.fin-amt.neg{color:var(--danger)}
+.fin-row-body{flex:1; min-width:0}
+.fin-note{font-size:14px; word-break:break-word}
+.fin-note.empty{color:var(--text-3)}
+.fin-meta{font-size:12px; color:var(--text-3); margin-top:2px}
+.fin-meta .who{font-weight:500; color:var(--text-2)}
+.fin-row .icon-btn{opacity:0; width:26px; height:26px; flex-shrink:0}
+.fin-row:hover .icon-btn{opacity:1}
+.fin-edit{display:flex; gap:8px}
+.fin-edit .inp{height:30px}
+.fin-edit .inp:first-child{flex:0 0 110px}
+.fin-edit .inp:last-child{flex:1; min-width:0}
+.fin-edit-actions{display:flex; gap:8px; margin-top:8px}
+.fin-empty{border:1.5px dashed var(--border-2); border-radius:12px; padding:26px 12px; text-align:center; color:var(--text-3); font-size:13.5px}
+.fin-localnote{font-size:12.5px; color:var(--warn); background:rgba(217,115,13,.1); border-radius:8px; padding:8px 10px; margin-bottom:12px}
+.app.view-finance .tb-center{display:none}
+
+/* ═══════════ Адаптив ═══════════ */
+@media (max-width:860px){
+  .tb-center{order:3; width:100%}
+  .search-wrap{flex:1; width:auto}
+  .board{padding:10px}
+  .columns{gap:8px}
+  .column{flex-basis:262px; width:262px}
+  .board-title{max-width:150px}
+  .col-grip{opacity:.75}
+}
+@media (max-width:640px){
+  .overlay{padding:0; align-items:stretch}
+  .modal{width:100%; max-height:none; height:100%; border-radius:0}
+  .cm-grid{grid-template-columns:1fr; gap:6px}
+  #syncText{display:none}
+  .seg button{padding:0 8px}
+  .add-col,.add-col-form{flex-basis:240px; width:240px}
+  .fin-form-row{flex-wrap:wrap}
+  .fin-form-row .inp.amt{flex:1 0 100%}
+  .fin-form-row .btn[type=submit]{width:100%}
+  .fin-total-value{font-size:28px}
+}
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.01ms!important; transition-duration:.01ms!important}
+}
+</style>
+</head>
+<body>
+
+<!-- ═══════════ Экран входа ═══════════ -->
+<div id="login" class="login-wrap hidden">
+  <form class="login-card" id="loginForm" autocomplete="off">
+    <span class="login-ico" data-ic="board" data-ics="26"></span>
+    <h1>Наша доска</h1>
+    <p class="login-sub">Общий канбан для двоих</p>
+    <input class="inp" type="password" id="loginPass" placeholder="Пароль" autocomplete="current-password">
+    <p class="login-err hidden" id="loginErr">Неверный пароль</p>
+    <button class="btn primary wide" type="submit">Войти</button>
+    <p class="login-hint">Пароль общий для всей семьи.<br>Он указан в файле index.html в строке APP_PASSWORD</p>
+  </form>
+</div>
+
+<!-- ═══════════ Приложение ═══════════ -->
+<div id="app" class="app hidden">
+  <header class="topbar">
+    <div class="tb-left">
+      <span class="brand-ico" data-ic="board" data-ics="15"></span>
+      <span id="tbTitleHost"></span>
+      <div class="seg" id="viewSeg" style="margin-left:4px">
+        <button type="button" data-v="board" class="active"><span data-ic="board" data-ics="13"></span>Доска</button>
+        <button type="button" data-v="finance"><span data-ic="wallet" data-ics="13"></span>Копилка</button>
+      </div>
+    </div>
+    <div class="tb-center">
+      <div class="search-wrap">
+        <span data-ic="search" data-ics="15"></span>
+        <input id="searchInput" placeholder="Поиск… ( / )" autocomplete="off">
+        <button id="searchClear" class="icon-btn hidden" style="width:20px;height:20px" data-ic="x" data-ics="13" title="Очистить"></button>
+      </div>
+      <div class="seg" id="assigneeSeg">
+        <button type="button" data-v="all" class="active">Все</button>
+        <button type="button" data-v="mine">Мои</button>
+        <button type="button" data-v="partner">Партнёр</button>
+      </div>
+      <button type="button" id="labelFilterBtn" class="btn ghost"></button>
+      <button type="button" id="resetFilters" class="btn ghost hidden">Сбросить</button>
+    </div>
+    <div class="tb-right">
+      <div id="syncBadge" class="sync wait"><span class="sync-dot"></span><span id="syncText">Подключение…</span></div>
+      <button type="button" id="settingsBtn" class="icon-btn" title="Настройки" data-ic="gear"></button>
+      <button type="button" id="themeBtn" class="icon-btn" title="Светлая/тёмная тема" data-ic="moon"></button>
+      <button type="button" id="logoutBtn" class="icon-btn" title="Выйти" data-ic="logout"></button>
+    </div>
+  </header>
+  <div id="modeBanner" class="mode-banner hidden"><span id="modeBannerText"></span><button type="button" id="bannerClose" class="icon-btn" style="width:22px;height:22px" data-ic="x" data-ics="14"></button></div>
+  <main class="board"><div id="columns" class="columns"></div></main>
+  <section id="financeView" class="finance hidden">
+    <div class="fin-wrap">
+      <div class="fin-room" id="finRoomPill">
+        <span>Комната копилки</span>
+        <span class="fin-room-code" id="finRoomCode">—</span>
+        <button type="button" class="btn ghost sm" id="finRoomChange">Сменить</button>
+      </div>
+      <div class="fin-localnote hidden" id="finLocalNote"></div>
+      <div class="fin-card fin-setup" id="finSetup">
+        <h2>Ваша общая копилка</h2>
+        <p>Введите <b>код комнаты</b> — одинаковый на обоих устройствах. Если вы уже пользовались отдельной копилкой, введите её прежний код: вся история подтянется автоматически.</p>
+        <div style="display:flex;gap:8px">
+          <input class="inp" id="finRoomInput" placeholder="Код комнаты" autocomplete="off" spellcheck="false">
+          <button type="button" class="btn primary" id="finRoomBtn" style="flex-shrink:0">Открыть</button>
+        </div>
+      </div>
+      <div id="finMain" class="hidden">
+        <div class="fin-card">
+          <div class="fin-total-label">Всего отложено</div>
+          <div class="fin-total-value" id="finTotal">0 ₽</div>
+          <div class="fin-pills" id="finPills"></div>
+          <div class="fin-planned" id="finPlanned"></div>
+        </div>
+        <form class="fin-card" id="finForm">
+          <div class="fin-form-top">
+            <div class="seg" id="finWho">
+              <button type="button" data-who="dinara" class="active"><span class="avatar wife" id="finWhoWifeAv">Д</span><span id="finWhoWife">Жена</span></button>
+              <button type="button" data-who="sasha"><span class="avatar husband" id="finWhoHusbandAv">С</span><span id="finWhoHusband">Муж</span></button>
+            </div>
+            <div class="seg" id="finType">
+              <button type="button" data-t="add" class="active">+ Отложить</button>
+              <button type="button" data-t="withdraw">− Снять</button>
+            </div>
+          </div>
+          <div class="fin-form-row">
+            <input class="inp amt" id="finAmount" type="number" inputmode="decimal" min="0" step="0.01" placeholder="Сумма, ₽">
+            <input class="inp note" id="finNote" type="text" maxlength="80" placeholder="На что / за что">
+            <button class="btn primary" type="submit">Добавить</button>
+          </div>
+        </form>
+        <div class="fin-list-head"><h2>История</h2><span class="fin-count" id="finCount"></span></div>
+        <div id="finList"></div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- ═══════════ Модалка карточки ═══════════ -->
+<div id="cardModal" class="overlay hidden">
+  <div class="modal">
+    <button type="button" class="icon-btn modal-x" id="cmClose" data-ic="x" title="Закрыть (Esc)"></button>
+    <div class="modal-body">
+      <input id="cmTitle" class="cm-title" placeholder="Название карточки" maxlength="300" autocomplete="off">
+      <div class="cm-grid">
+        <div class="cm-main">
+          <label class="fld">Описание</label>
+          <textarea id="cmDesc" class="cm-desc" placeholder="Добавьте подробности…"></textarea>
+          <label class="fld">Чек-лист <span class="fld-hint" id="cmCheckCount"></span></label>
+          <div class="progress" id="cmProgress" style="display:none"><i></i></div>
+          <div id="cmChecklist"></div>
+          <div style="margin-top:6px">
+            <button type="button" class="btn ghost sm" id="cmAddCheck"><span data-ic="plus" data-ics="14"></span>Добавить пункт</button>
+            <input class="inp hidden" id="cmAddCheckInput" placeholder="Новый пункт — Enter, чтобы добавить" maxlength="200" autocomplete="off">
+          </div>
+        </div>
+        <div class="cm-side">
+          <label class="fld">Метки <span class="fld-hint">до 3</span></label>
+          <div class="chips" id="cmLabels"></div>
+          <label class="fld">Исполнитель</label>
+          <div class="asg-grid" id="cmAssignee"></div>
+          <label class="fld">Дедлайн</label>
+          <input class="inp" type="date" id="cmDue">
+          <div class="date-btns">
+            <button type="button" class="btn ghost sm" data-due="0">Сегодня</button>
+            <button type="button" class="btn ghost sm" data-due="1">Завтра</button>
+            <button type="button" class="btn ghost sm" data-due="7">Через неделю</button>
+            <button type="button" class="btn ghost sm" id="cmDueClear">Убрать</button>
+          </div>
+          <label class="fld">Начало</label>
+          <input class="inp" type="datetime-local" id="cmStart">
+          <div class="date-btns">
+            <button type="button" class="btn ghost sm" data-start="0">Сегодня</button>
+            <button type="button" class="btn ghost sm" data-start="1">Завтра</button>
+            <button type="button" class="btn ghost sm" id="cmStartClear">Убрать</button>
+          </div>
+          <label class="fld">Конец</label>
+          <input class="inp" type="datetime-local" id="cmEnd">
+          <div class="date-btns">
+            <button type="button" class="btn ghost sm" data-endh="1">+1 час</button>
+            <button type="button" class="btn ghost sm" data-endh="2">+2 часа</button>
+            <button type="button" class="btn ghost sm" id="cmEndClear">Убрать</button>
+          </div>
+          <label class="fld">Приоритет</label>
+          <div class="chips" id="cmPriority"></div>
+          <label class="fld">Стоимость, ₽</label>
+          <input class="inp" type="number" id="cmCost" min="0" step="1" inputmode="decimal" placeholder="0">
+          <div id="cmPay"></div>
+          <label class="fld">Создана</label>
+          <div class="cm-created" id="cmCreated"></div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button type="button" class="btn danger-ghost" id="cmDelete"><span data-ic="trash" data-ics="15"></span><span>Удалить</span></button>
+      <span class="saved-note" id="cmSaved">Сохранено</span>
+      <span style="flex:1"></span>
+      <button type="button" class="btn primary" id="cmSave">Сохранить</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ Модалка настроек ═══════════ -->
+<div id="settingsModal" class="overlay hidden">
+  <div class="modal" style="width:min(460px,100%)">
+    <button type="button" class="icon-btn modal-x" id="stClose" data-ic="x" title="Закрыть"></button>
+    <div class="modal-body">
+      <h2 class="modal-h">Настройки</h2>
+      <label class="fld">Название доски</label>
+      <input class="inp" id="stBoardName" maxlength="60" autocomplete="off">
+      <label class="fld">Имена на доске</label>
+      <div class="st-names">
+        <span class="avatar husband">М</span><input class="inp" id="stHusband" maxlength="20" placeholder="Муж" autocomplete="off">
+        <span class="avatar wife">Ж</span><input class="inp" id="stWife" maxlength="20" placeholder="Жена" autocomplete="off">
+      </div>
+      <label class="fld">Кто вы на этом устройстве?</label>
+      <div class="seg" id="stIdentity" style="max-width:220px">
+        <button type="button" data-v="husband">Муж</button>
+        <button type="button" data-v="wife">Жена</button>
+      </div>
+      <p class="fld-note">Влияет на фильтры «Мои» и «Партнёр». Настройка хранится только на этом устройстве.</p>
+      <label class="fld">Синхронизация</label>
+      <p class="fld-note" id="stSyncInfo"></p>
+    </div>
+    <div class="modal-foot">
+      <span style="flex:1"></span>
+      <button type="button" class="btn ghost" id="stCancel">Отмена</button>
+      <button type="button" class="btn primary" id="stSave">Сохранить</button>
+    </div>
+  </div>
+</div>
+
+<div id="dropdown" class="menu hidden"></div>
+
+<script>
+(function(){
+'use strict';
+
+/* ════════════════════════════════════════════════════════════
+   КОНФИГУРАЦИЯ — поменяйте эти две строки под себя
+   ════════════════════════════════════════════════════════════ */
+const APP_PASSWORD = '11062011';             // ← общий пароль для входа
+/* Ваша база из «Нашей копилки» — правила базы открыты внутри rooms/{код}:
+   доска → rooms/our-board-2025/board, копилка → rooms/{код комнаты}/entries */
+const FIREBASE_CONFIG = { databaseURL: 'https://nasha-kopilka-default-rtdb.asia-southeast1.firebasedatabase.app' };
+const QS_BOARD = (function(){ try { return new URLSearchParams(location.search).get('board'); } catch(e){ return null; } })();
+const BOARD_ID = (QS_BOARD && /^[a-zA-Z0-9_-]{1,40}$/.test(QS_BOARD)) ? 'boards-' + QS_BOARD : 'our-board-2025';
+const CDN = 'https://www.gstatic.com/firebasejs/10.14.1/';
+const FIN_ROOM_KEY = 'piggy_room';             // тот же ключ, что и в старой копилке — история подтянется
+
+/* ═══════════ Константы ═══════════ */
+const LABELS = {
+  red:   { name:'Красный',    color:'#e03e3e' },
+  orange:{ name:'Оранжевый',  color:'#d9730d' },
+  yellow:{ name:'Жёлтый',     color:'#dfab01' },
+  green: { name:'Зелёный',    color:'#0f7b6c' },
+  blue:  { name:'Синий',      color:'#2383e2' },
+  purple:{ name:'Фиолетовый', color:'#6940a5' }
+};
+const LS = { state:'ourBoardStateV1', auth:'ourBoardAuth', theme:'ourBoardTheme', id:'ourBoardIdentity', banner:'ourBoardBannerClosed', fin:'ourBoardFinLocal', view:'ourBoardView' };
+const DEFAULT_META = { boardName:'Наша доска', husbandName:'Муж', wifeName:'Жена' };
+const PRIORITY = {
+  low:  { name:'Низкий',   color:'#2383e2' },
+  med:  { name:'Средний',  color:'#dfab01' },
+  high: { name:'Высокий',  color:'#e03e3e' }
+};
+/* ключи исполнителей в копилке — как в старом приложении, чтобы история совпадала */
+const KOP_WHO = { husband:'sasha', wife:'dinara' };
+
+/* ═══════════ Иконки (инлайн SVG, стиль Lucide) ═══════════ */
+const I = {
+  plus:'<path d="M12 5v14M5 12h14"/>',
+  search:'<circle cx="11" cy="11" r="7"/><path d="M21 21l-4.35-4.35"/>',
+  x:'<path d="M18 6L6 18M6 6l12 12"/>',
+  'dots-h':'<circle cx="5" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="19" cy="12" r="1.6" fill="currentColor" stroke="none"/>',
+  'dots-v':'<circle cx="12" cy="5" r="1.6" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="12" cy="19" r="1.6" fill="currentColor" stroke="none"/>',
+  grip:'<circle cx="9" cy="6" r="1.4" fill="currentColor" stroke="none"/><circle cx="15" cy="6" r="1.4" fill="currentColor" stroke="none"/><circle cx="9" cy="12" r="1.4" fill="currentColor" stroke="none"/><circle cx="15" cy="12" r="1.4" fill="currentColor" stroke="none"/><circle cx="9" cy="18" r="1.4" fill="currentColor" stroke="none"/><circle cx="15" cy="18" r="1.4" fill="currentColor" stroke="none"/>',
+  gear:'<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h.01a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h.01a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v.01a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>',
+  sun:'<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/>',
+  moon:'<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>',
+  logout:'<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5M21 12H9"/>',
+  cal:'<rect x="3" y="4" width="18" height="17" rx="2"/><path d="M16 2v4M8 2v4M3 9.5h18"/>',
+  clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+  flag:'<path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><path d="M4 22v-7"/>',
+  wallet:'<path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4z"/>',
+  check:'<path d="M20 6L9 17l-5-5"/>',
+  checksq:'<path d="M9 11.5l2.5 2.5L21 4.5"/><path d="M21 12v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h11"/>',
+  text:'<path d="M17 10H3M21 6H3M21 14H3M17 18H3"/>',
+  trash:'<path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>',
+  edit:'<path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5z"/>',
+  board:'<rect x="3" y="3" width="5" height="14" rx="1.5" fill="currentColor" stroke="none"/><rect x="9.5" y="3" width="5" height="9" rx="1.5" fill="currentColor" stroke="none"/><rect x="16" y="3" width="5" height="17" rx="1.5" fill="currentColor" stroke="none"/>'
+};
+function icon(name, s){
+  s = s || 16;
+  return '<svg class="ic" width="'+s+'" height="'+s+'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">'+I[name]+'</svg>';
+}
+
+/* ═══════════ Состояние ═══════════ */
+let state = null;
+let fbMode=false, connected=false, remoteReady=false, dirtyLocal=false;
+let db=null, boardRef=null;
+let dragCtx=null, pendingRemote=null, suppressClickUntil=0, lastAddedCardId=null, menuArmed=null;
+let cm = null; // открытая модалка карточки: {cardId, labels, assignee, priority, dirty}
+let finEntries = {}, finUnsub = null, finEditId = null;
+const ui = { search:'', assignee:'all', labels:new Set(), quickAdd:null, identity: localStorage.getItem(LS.id)||null, view: localStorage.getItem(LS.view)||'board' };
+const scrollMemo = {};
+
+/* ═══════════ Утилиты ═══════════ */
+const $ = function(s){ return document.querySelector(s); };
+const $$ = function(s){ return Array.prototype.slice.call(document.querySelectorAll(s)); };
+function h(tag, attrs){
+  const el = document.createElement(tag);
+  if (attrs) for (const k in attrs){
+    const v = attrs[k];
+    if (v === null || v === undefined || v === false) continue;
+    if (k === 'class') el.className = v;
+    else if (k === 'style') el.style.cssText = v;
+    else if (k === 'html') el.innerHTML = v;
+    else if (k.slice(0,2) === 'on' && typeof v === 'function') el.addEventListener(k.slice(2), v);
+    else el.setAttribute(k, v === true ? '' : v);
+  }
+  for (let i=2; i<arguments.length; i++){
+    const c = arguments[i];
+    if (c === null || c === undefined || c === false) continue;
+    if (Array.isArray(c)) c.forEach(function(x){ if (x!==null && x!==undefined && x!==false) el.append(x.nodeType ? x : document.createTextNode(String(x))); });
+    else el.append(c.nodeType ? c : document.createTextNode(String(c)));
+  }
+  return el;
+}
+let _uid = 0;
+function uid(p){ return p + '_' + Date.now().toString(36) + (++_uid).toString(36) + Math.random().toString(36).slice(2,6); }
+function canon(v){
+  if (Array.isArray(v)) return v.map(canon);
+  if (v && typeof v === 'object'){ const o={}; Object.keys(v).sort().forEach(function(k){ if (v[k]!==undefined) o[k]=canon(v[k]); }); return o; }
+  return v;
+}
+function statesEqual(a,b){
+  try { return JSON.stringify(canon(a)) === JSON.stringify(canon(b)); } catch(e){ return false; }
+}
+function normArr(x){
+  if (Array.isArray(x)) return x;
+  if (x && typeof x === 'object') return Object.keys(x).sort(function(a,b){ return Number(a)-Number(b); }).map(function(k){ return x[k]; });
+  return [];
+}
+const MONTHS = ['янв','фев','мар','апр','мая','июн','июл','авг','сен','окт','ноя','дек'];
+function pad2(n){ return (n<10?'0':'')+n; }
+function todayStr(){ const d=new Date(); return d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate()); }
+function dateStrOffset(days){ const d=new Date(); d.setDate(d.getDate()+days); return d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate()); }
+function fmtDate(s){
+  if (!s) return '';
+  const p = s.split('-').map(Number);
+  if (p.length!==3 || !p[0] || !p[1] || !p[2]) return s;
+  return p[2]+' '+MONTHS[p[1]-1]+(p[0]!==new Date().getFullYear()?' '+p[0]:'');
+}
+function fmtFull(ts){
+  const d = new Date(ts); if (!ts || isNaN(d.getTime())) return '';
+  const hm = pad2(d.getHours())+':'+pad2(d.getMinutes());
+  const cur = new Date();
+  return d.getDate()+' '+MONTHS[d.getMonth()]+(d.getFullYear()!==cur.getFullYear()?' '+d.getFullYear():'')+', '+hm;
+}
+function plural(n, one, few, many){
+  const m10 = n % 10, m100 = n % 100;
+  if (m10 === 1 && m100 !== 11) return one;
+  if (m10 >= 2 && m10 <= 4 && (m100 < 10 || m100 >= 20)) return few;
+  return many;
+}
+function esc(s){
+  return String(s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; });
+}
+function nowLocalIso(){
+  const d = new Date();
+  return d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate())+'T'+pad2(d.getHours())+':'+pad2(d.getMinutes());
+}
+function fmtDateTime(s){
+  if (!s) return '';
+  const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(s);
+  if (!m) return s;
+  return Number(m[3])+' '+MONTHS[Number(m[2])-1]+', '+m[4]+':'+m[5];
+}
+function fmtMoneyRu(n){
+  const v = Math.round(Math.abs(Number(n) || 0) * 100) / 100;
+  const hasDec = Math.abs(v - Math.trunc(v)) > 0.001;
+  return new Intl.NumberFormat('ru-RU', { minimumFractionDigits: hasDec ? 2 : 0, maximumFractionDigits: 2 }).format(v) + ' ₽';
+}
+function addHoursIso(isoStr, hours){
+  const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(isoStr || '');
+  const base = m ? new Date(Number(m[1]), Number(m[2])-1, Number(m[3]), Number(m[4]), Number(m[5])) : new Date();
+  base.setMinutes(base.getMinutes() + Math.round(hours * 60));
+  return base.getFullYear()+'-'+pad2(base.getMonth()+1)+'-'+pad2(base.getDate())+'T'+pad2(base.getHours())+':'+pad2(base.getMinutes());
+}
+function scheduleText(card){
+  if (!card.startAt && !card.endAt) return '';
+  if (card.startAt && card.endAt){
+    const same = card.startAt.slice(0,10) === card.endAt.slice(0,10);
+    return fmtDateTime(card.startAt) + ' – ' + (same ? card.endAt.slice(11,16) : fmtDateTime(card.endAt));
+  }
+  if (card.startAt) return 'с ' + fmtDateTime(card.startAt);
+  return 'до ' + fmtDateTime(card.endAt);
+}
+function kopName(who){ return who === 'dinara' ? meta().wifeName : meta().husbandName; }
+function kopAvatar(who){ return who === 'dinara' ? 'wife' : 'husband'; }
+function sanitizeRoom(str){
+  return String(str).trim().toLowerCase()
+    .replace(/[^a-z0-9а-яё\-_]/gi, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '')
+    .slice(0, 60);
+}
+function finRoom(){ return localStorage.getItem(FIN_ROOM_KEY) || ''; }
+function debounce(fn, ms){ let t; return function(){ const a=arguments, self=this; clearTimeout(t); t=setTimeout(function(){ fn.apply(self,a); }, ms); }; }
+function meta(){ return (state && state.meta) ? state.meta : DEFAULT_META; }
+
+/* ═══════════ Нормализация и сид состояния ═══════════ */
+function sortedColumnsOf(s){ return Object.values(s.columns).sort(function(a,b){ return (a.order-b.order)||(a.createdAt-b.createdAt); }); }
+function sortedColumns(){ return sortedColumnsOf(state); }
+function columnCards(colId){
+  return Object.values(state.cards).filter(function(c){ return c.columnId===colId; })
+    .sort(function(a,b){ return (a.order-b.order)||(a.createdAt-b.createdAt); });
+}
+function normalizeState(raw){
+  const s = { columns:{}, cards:{}, meta:Object.assign({}, DEFAULT_META) };
+  if (!raw || typeof raw !== 'object') return s;
+  const cols = raw.columns || {};
+  Object.keys(cols).forEach(function(id){
+    const c = cols[id]; if (!c || typeof c!=='object') return;
+    s.columns[id] = {
+      id: id,
+      title: String(c.title || 'Колонка').slice(0,60),
+      order: Number(c.order) || 0,
+      color: (typeof c.color==='string' && /^#[0-9a-fA-F]{6}$/.test(c.color)) ? c.color : null,
+      createdAt: Number(c.createdAt) || 0
+    };
+  });
+  const cards = raw.cards || {};
+  Object.keys(cards).forEach(function(id){
+    const c = cards[id]; if (!c || typeof c!=='object') return;
+    s.cards[id] = {
+      id: id,
+      columnId: String(c.columnId || ''),
+      title: String(c.title || 'Без названия').slice(0,300),
+      description: String(c.description || '').slice(0,5000),
+      checklist: normArr(c.checklist).slice(0,50).map(function(it){
+        return { id: String((it && it.id) || uid('i')), text: String((it && it.text) || '').slice(0,200), done: !!(it && it.done) };
+      }),
+      labels: normArr(c.labels).filter(function(l){ return !!LABELS[l]; }).slice(0,3),
+      assignee: ['husband','wife','both'].indexOf(c.assignee)>=0 ? c.assignee : null,
+      dueDate: (typeof c.dueDate==='string' && /^\d{4}-\d{2}-\d{2}$/.test(c.dueDate)) ? c.dueDate : null,
+      priority: ['low','med','high'].indexOf(c.priority)>=0 ? c.priority : null,
+      startAt: (typeof c.startAt==='string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(c.startAt)) ? c.startAt.slice(0,16) : null,
+      endAt: (typeof c.endAt==='string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(c.endAt)) ? c.endAt.slice(0,16) : null,
+      cost: (isFinite(Number(c.cost)) && Number(c.cost) > 0) ? Math.round(Number(c.cost)*100)/100 : null,
+      paidEntryId: (typeof c.paidEntryId==='string' && c.paidEntryId) ? c.paidEntryId : null,
+      paidBy: ['sasha','dinara'].indexOf(c.paidBy)>=0 ? c.paidBy : null,
+      paidAt: Number(c.paidAt) || 0,
+      order: Number(c.order) || 0,
+      createdAt: Number(c.createdAt) || 0,
+      updatedAt: Number(c.updatedAt) || 0
+    };
+  });
+  if (raw.meta && typeof raw.meta==='object'){
+    s.meta.boardName = String(raw.meta.boardName || DEFAULT_META.boardName).slice(0,60);
+    s.meta.husbandName = String(raw.meta.husbandName || DEFAULT_META.husbandName).slice(0,20);
+    s.meta.wifeName = String(raw.meta.wifeName || DEFAULT_META.wifeName).slice(0,20);
+  }
+  const first = sortedColumnsOf(s)[0];
+  if (first){
+    Object.keys(s.cards).forEach(function(id){ if (!s.columns[s.cards[id].columnId]) s.cards[id].columnId = first.id; });
+  } else { s.cards = {}; }
+  return s;
+}
+function defaultState(){
+  const t = Date.now(); const columns = {};
+  ['Бэклог','Сегодня','В работе','Готово'].forEach(function(title,i){
+    const cid = uid('col');
+    columns[cid] = { id:cid, title:title, order:i, color:null, createdAt:t+i };
+  });
+  return { columns:columns, cards:{}, meta:Object.assign({}, DEFAULT_META) };
+}
+function hasContent(s){ return Object.keys(s.columns).length>0 || Object.keys(s.cards).length>0; }
+
+/* ═══════════ Локальное хранилище ═══════════ */
+function loadLocal(){
+  try {
+    const raw = localStorage.getItem(LS.state);
+    if (!raw) return null;
+    return normalizeState(JSON.parse(raw));
+  } catch(e){ return null; }
+}
+const saveLocal = debounce(function(){
+  try { localStorage.setItem(LS.state, JSON.stringify(state)); } catch(e){}
+}, 120);
+function flushLocal(){
+  try { localStorage.setItem(LS.state, JSON.stringify(state)); } catch(e){}
+}
+window.addEventListener('beforeunload', flushLocal);
+
+/* ═══════════ Firebase ═══════════ */
+function loadScript(src){
+  return new Promise(function(res, rej){
+    const s = document.createElement('script');
+    s.src = src; s.onload = res; s.onerror = rej;
+    document.head.appendChild(s);
+  });
+}
+function withTimeout(p, ms){
+  return Promise.race([p, new Promise(function(_, rej){ setTimeout(function(){ rej(new Error('timeout')); }, ms); })]);
+}
+function dbUrl(){
+  const u = ((FIREBASE_CONFIG && FIREBASE_CONFIG.databaseURL) || '').trim();
+  return (u && u.indexOf('http')===0) ? u : '';
+}
+function initFirebase(){
+  const url = dbUrl();
+  if (!url){
+    setLocalMode('Локальный режим: изменения сохраняются только на этом устройстве. Чтобы синхронизировать доску между устройствами, вставьте URL Firebase в FIREBASE_CONFIG в начале файла.');
+    return;
+  }
+  setSync('wait');
+  let ready;
+  if (typeof firebase !== 'undefined') ready = Promise.resolve();
+  else ready = withTimeout(
+    loadScript(CDN+'firebase-app-compat.js').then(function(){ return loadScript(CDN+'firebase-database-compat.js'); }),
+    9000
+  );
+  ready.then(function(){
+    try {
+      firebase.initializeApp({ databaseURL: url });
+      db = firebase.database();
+      boardRef = db.ref('rooms/' + BOARD_ID + '/board');
+      fbMode = true;
+      db.ref('.info/connected').on('value', function(snap){
+        connected = !!snap.val();
+        if (connected && remoteReady && dirtyLocal){ dirtyLocal = false; boardRef.set(state); }
+        updateSyncUI();
+      });
+      boardRef.on('value', function(snap){ onRemoteState(snap.val()); }, function(err){
+        console.warn('Firebase:', err);
+        setLocalMode('Нет доступа к Firebase — работаем локально. Проверьте правила базы.');
+      });
+      finSubscribe();
+    } catch(e){
+      console.warn(e);
+      setLocalMode('Не удалось подключиться к Firebase — работаем локально.');
+    }
+  }).catch(function(){
+    setLocalMode('Firebase недоступен — работаем локально. Проверьте databaseURL и интернет.');
+  });
+}
+function onRemoteState(raw){
+  if (!remoteReady){
+    remoteReady = true;
+    if (!raw){
+      if (hasContent(state)) boardRef.set(state);
+      else { state = defaultState(); saveLocal(); boardRef.set(state); }
+      renderAll(); updateSyncUI(); return;
+    }
+    const remote = normalizeState(raw);
+    let added = false;
+    Object.keys(state.columns).forEach(function(id){ if (!remote.columns[id]){ remote.columns[id]=state.columns[id]; added=true; } });
+    Object.keys(state.cards).forEach(function(id){ if (!remote.cards[id]){ remote.cards[id]=state.cards[id]; added=true; } });
+    if (added){
+      const first = sortedColumnsOf(remote)[0];
+      if (first) Object.keys(remote.cards).forEach(function(id){ if (!remote.columns[remote.cards[id].columnId]) remote.cards[id].columnId = first.id; });
+    }
+    state = remote; saveLocal();
+    if (added) boardRef.set(state);
+    renderAll(); updateSyncUI(); return;
+  }
+  if (dragCtx && dragCtx.started){ pendingRemote = raw; return; }
+  const inc = normalizeState(raw);
+  if (statesEqual(inc, state)) return;
+  state = inc; saveLocal(); renderAll(); syncModalWithRemote();
+}
+function syncWrite(updates){
+  saveLocal();
+  if (!fbMode || !remoteReady) return;
+  try { boardRef.update(updates).catch(function(){ dirtyLocal = true; }); } catch(e){ dirtyLocal = true; }
+}
+function setLocalMode(reason){
+  fbMode = false; connected = false; updateSyncUI();
+  if (reason && localStorage.getItem(LS.banner) !== '1'){
+    const b = $('#modeBannerText'); if (b){ b.textContent = reason; $('#modeBanner').classList.remove('hidden'); }
+  }
+}
+function setSync(cls){
+  const badge = $('#syncBadge'); if (!badge) return;
+  badge.classList.remove('ok','err','wait','local');
+  badge.classList.add(cls);
+  $('#syncText').textContent = cls==='ok' ? 'Синхронизировано' : cls==='err' ? 'Нет связи' : 'Подключение…';
+}
+function updateSyncUI(){
+  if (!fbMode){ setSync('local'); $('#syncText').textContent = 'Локально'; return; }
+  if (!remoteReady){ setSync('wait'); return; }
+  if (!connected){ setSync('err'); return; }
+  setSync('ok');
+}
+
+/* ═══════════ Мутации ═══════════ */
+function addCard(colId, title){
+  const t = String(title||'').trim(); if (!t || !state.columns[colId]) return null;
+  const list = columnCards(colId);
+  const card = {
+    id: uid('card'), columnId: colId, title: t.slice(0,300), description:'',
+    checklist:[], labels:[], assignee:null, dueDate:null,
+    priority:null, startAt:null, endAt:null, cost:null,
+    paidEntryId:null, paidBy:null, paidAt:0,
+    order: list.length ? list[list.length-1].order+1 : 0,
+    createdAt: Date.now(), updatedAt: Date.now()
+  };
+  state.cards[card.id] = card;
+  lastAddedCardId = card.id;
+  renderBoard();
+  const upd = {}; upd['cards/'+card.id] = card;
+  syncWrite(upd);
+  return card;
+}
+function updateCard(id, patch, noRender){
+  const card = state.cards[id]; if (!card) return;
+  Object.assign(card, patch);
+  card.updatedAt = Date.now();
+  if (!noRender) renderBoard();
+  const upd = {}; upd['cards/'+id] = card;
+  syncWrite(upd);
+}
+function deleteCard(id){
+  if (!state.cards[id]) return;
+  delete state.cards[id];
+  if (cm && cm.cardId === id){ cm = null; $('#cardModal').classList.add('hidden'); }
+  renderBoard();
+  const upd = {}; upd['cards/'+id] = null;
+  syncWrite(upd);
+}
+function orderBetween(prev, next){
+  if (prev && next) return (prev.order + next.order) / 2;
+  if (prev) return prev.order + 1000;
+  if (next) return next.order - 1000;
+  return 0;
+}
+function moveCardByOrder(cardId, toColId, newOrder){
+  const card = state.cards[cardId]; if (!card || !state.columns[toColId]) return;
+  const from = card.columnId;
+  card.columnId = toColId; card.order = newOrder; card.updatedAt = Date.now();
+  const upd = {}; upd['cards/'+cardId] = card;
+  const renorm = function(colId){
+    columnCards(colId).forEach(function(c, idx){
+      if (c.order !== idx){ c.order = idx; upd['cards/'+c.id] = c; }
+    });
+  };
+  renorm(toColId);
+  if (from !== toColId) renorm(from);
+  renderBoard();
+  syncWrite(upd);
+}
+function addColumn(title){
+  const t = String(title||'').trim(); if (!t) return;
+  const cols = sortedColumns();
+  const id = uid('col');
+  const col = { id:id, title: t.slice(0,60), order: cols.length ? cols[cols.length-1].order+1 : 0, color:null, createdAt: Date.now() };
+  state.columns[id] = col;
+  renderBoard();
+  const upd = {}; upd['columns/'+id] = col;
+  syncWrite(upd);
+}
+function renameColumn(id, title){
+  const col = state.columns[id]; const t = String(title||'').trim();
+  if (!col || !t) return;
+  col.title = t.slice(0,60);
+  renderBoard();
+  const upd = {}; upd['columns/'+id] = col;
+  syncWrite(upd);
+}
+function setColumnColor(id, hex){
+  const col = state.columns[id]; if (!col) return;
+  col.color = hex || null;
+  renderBoard();
+  const upd = {}; upd['columns/'+id] = col;
+  syncWrite(upd);
+}
+function deleteColumn(id){
+  if (!state.columns[id]) return;
+  const upd = {}; upd['columns/'+id] = null;
+  Object.keys(state.cards).forEach(function(cid){
+    if (state.cards[cid].columnId === id){ delete state.cards[cid]; upd['cards/'+cid] = null; }
+  });
+  delete state.columns[id];
+  if (ui.quickAdd && ui.quickAdd.colId === id) ui.quickAdd = null;
+  renderBoard();
+  syncWrite(upd);
+}
+function moveColumnById(colId, newIndex){
+  const list = sortedColumns().map(function(c){ return c.id; }).filter(function(id){ return id !== colId; });
+  newIndex = Math.max(0, Math.min(newIndex, list.length));
+  list.splice(newIndex, 0, colId);
+  const upd = {};
+  list.forEach(function(id, i){
+    const col = state.columns[id];
+    if (col && col.order !== i){ col.order = i; upd['columns/'+id] = col; }
+  });
+  renderBoard();
+  syncWrite(upd);
+}
+function updateMeta(patch){
+  Object.assign(state.meta, patch);
+  renderHeader(); renderBoard();
+  syncWrite({ meta: state.meta });
+}
+
+/* ═══════════ Фильтры ═══════════ */
+function identityOf(){ return (ui.identity==='husband' || ui.identity==='wife') ? ui.identity : null; }
+function partnerOf(id){ return id==='husband' ? 'wife' : 'husband'; }
+function filtersActive(){ return ui.search !== '' || ui.assignee !== 'all' || ui.labels.size > 0; }
+function resetFilters(){
+  ui.search = ''; $('#searchInput').value = '';
+  ui.assignee = 'all'; ui.labels.clear();
+  updateFilterUI(); renderBoard();
+}
+function cardMatches(card){
+  if (ui.search){
+    const q = ui.search.toLowerCase();
+    if ((card.title + ' ' + card.description).toLowerCase().indexOf(q) < 0) return false;
+  }
+  if (ui.assignee !== 'all'){
+    const me = identityOf(); if (!me) return false;
+    if (ui.assignee==='mine' && !(card.assignee===me || card.assignee==='both')) return false;
+    if (ui.assignee==='partner' && !(card.assignee===partnerOf(me) || card.assignee==='both')) return false;
+  }
+  if (ui.labels.size && !card.labels.some(function(l){ return ui.labels.has(l); })) return false;
+  return true;
+}
+function updateFilterUI(){
+  $('#resetFilters').classList.toggle('hidden', !filtersActive());
+  $$('#assigneeSeg button').forEach(function(b){ b.classList.toggle('active', b.dataset.v === ui.assignee); });
+  $('#searchClear').classList.toggle('hidden', !ui.search);
+  const n = ui.labels.size;
+  $('#labelFilterBtn').innerHTML = icon('checksq',15) + '<span>Метки</span>' + (n ? '<span style="color:var(--accent);font-weight:600">' + n + '</span>' : '');
+}
+
+/* ═══════════ Рендеринг ═══════════ */
+function renderHeader(){
+  const host = $('#tbTitleHost');
+  if (host){
+    host.innerHTML = '';
+    host.appendChild(h('span', { id:'boardTitle', class:'board-title', title:'Кликните, чтобы переименовать' }, meta().boardName));
+  }
+  document.title = meta().boardName;
+}
+function renderAll(){ renderHeader(); renderBoard(); updateSyncUI(); updateFilterUI(); if (ui.view === 'finance') renderFinance(); }
+function renderBoard(){
+  const wrap = $('#columns');
+  $$('#columns .col-cards').forEach(function(el){ if (el.dataset.col) scrollMemo[el.dataset.col] = el.scrollTop; });
+  wrap.innerHTML = '';
+  const cols = sortedColumns();
+  cols.forEach(function(col){ wrap.appendChild(buildColumn(col)); });
+  wrap.appendChild(buildAddColumn());
+  cols.forEach(function(col){
+    const listEl = wrap.querySelector('.col-cards[data-col="'+col.id+'"]');
+    if (listEl && scrollMemo[col.id]) listEl.scrollTop = scrollMemo[col.id];
+  });
+  if (ui.quickAdd) restoreQuickAdd();
+  if (lastAddedCardId){
+    const el = wrap.querySelector('[data-card="'+lastAddedCardId+'"]');
+    if (el) el.classList.add('card-enter');
+    lastAddedCardId = null;
+  }
+}
+function buildColumn(col){
+  const cardsAll = columnCards(col.id);
+  const visible = cardsAll.filter(cardMatches);
+  const el = h('div', { class:'column', 'data-col':col.id });
+  if (col.color) el.style.borderTopColor = col.color;
+  const countTxt = (filtersActive() && visible.length !== cardsAll.length)
+    ? visible.length + '/' + cardsAll.length
+    : String(cardsAll.length);
+  const head = h('div', { class:'col-head' },
+    h('span', { class:'col-grip', title:'Перетащите, чтобы передвинуть колонку', html:icon('grip',14) }),
+    h('span', { class:'col-title' }, h('span', { class:'col-name', title:col.title }, col.title)),
+    h('span', { class:'col-count' }, countTxt),
+    h('button', { type:'button', class:'icon-btn col-menu-btn', title:'Меню колонки', html:icon('dots-h',16), style:'width:26px;height:26px' })
+  );
+  const list = h('div', { class:'col-cards', 'data-col':col.id });
+  visible.forEach(function(c){ list.appendChild(buildCard(c)); });
+  if (!visible.length){
+    list.appendChild(h('div', { class:'empty-col' }, filtersActive() ? 'Под фильтры ничего не подошло' : 'Перетащи карточку сюда'));
+  }
+  el.append(head, list, buildQuickAdd(col.id));
+  return el;
+}
+function buildCard(card){
+  const el = h('div', { class:'card', 'data-card':card.id });
+  if (card.labels.length){
+    el.appendChild(h('div', { class:'card-labels' },
+      card.labels.map(function(l){ return h('span', { class:'lb', style:'background:'+LABELS[l].color, title:LABELS[l].name }); })
+    ));
+  }
+  el.appendChild(h('div', { class:'card-title' }, card.title));
+  const row = h('div', { class:'card-meta' });
+  if (card.dueDate){
+    const today = todayStr();
+    row.appendChild(h('span', {
+      class:'due' + (card.dueDate < today ? ' overdue' : card.dueDate === today ? ' today' : ''),
+      html: icon('cal',12) + '<span>' + fmtDate(card.dueDate) + '</span>'
+    }));
+  }
+  if (card.priority){
+    row.appendChild(h('span', {
+      class:'meta-it prio-flag', title:'Приоритет: ' + PRIORITY[card.priority].name,
+      html: '<svg class="ic" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="'+PRIORITY[card.priority].color+'" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">'+I.flag+'</svg>'
+    }));
+  }
+  const sched = scheduleText(card);
+  if (sched){
+    const over = card.endAt && card.endAt < nowLocalIso();
+    row.appendChild(h('span', {
+      class:'due' + (over ? ' overdue' : ''), title:'Запланировано',
+      html: icon('clock',12) + '<span>' + sched + '</span>'
+    }));
+  }
+  if (card.cost){
+    row.appendChild(h('span', {
+      class:'due cost' + (card.paidEntryId ? ' paid' : ''),
+      title: card.paidEntryId ? 'Оплачено из копилки' : 'Стоимость',
+      html: (card.paidEntryId ? icon('check',11) : '') + '<span>' + fmtMoneyRu(card.cost) + '</span>'
+    }));
+  }
+  if (card.checklist.length){
+    const done = card.checklist.filter(function(i){ return i.done; }).length;
+    row.appendChild(h('span', {
+      class:'meta-it' + (done === card.checklist.length ? ' alldone' : ''),
+      html: icon('checksq',13) + '<span>' + done + '/' + card.checklist.length + '</span>'
+    }));
+  }
+  if (card.description) row.appendChild(h('span', { class:'meta-it', html:icon('text',13), title:'Есть описание' }));
+  if (card.assignee){ row.appendChild(h('span', { class:'meta-spacer' })); row.appendChild(avatarEl(card.assignee)); }
+  el.appendChild(row);
+  el.appendChild(h('button', { type:'button', class:'card-menu-btn', html:icon('dots-v',15), title:'Меню карточки' }));
+  return el;
+}
+function avatarEl(kind){
+  const nm = function(k){ return (k==='husband' ? meta().husbandName : meta().wifeName) || '?'; };
+  const one = function(k){
+    const first = (nm(k).trim()[0] || '?').toUpperCase();
+    return h('span', { class:'avatar '+k, title:nm(k) }, first);
+  };
+  if (kind === 'both') return h('span', { class:'avatar-pair', title:nm('husband')+' + '+nm('wife') }, one('husband'), one('wife'));
+  return one(kind);
+}
+
+/* ═══════════ Быстрое добавление карточек ═══════════ */
+function buildQuickAdd(colId){
+  const wrapEl = h('div', { class:'qa', 'data-qa':colId });
+  const open = ui.quickAdd && ui.quickAdd.colId === colId;
+  if (!open){
+    wrapEl.appendChild(h('button', { type:'button', class:'qa-btn', html:icon('plus',15)+'<span>Добавить карточку</span>' }));
+    return wrapEl;
+  }
+  const form = h('form', { class:'qa-form' });
+  const ta = h('textarea', { placeholder:'Название карточки… (Enter — добавить)' });
+  ta.value = ui.quickAdd.text || '';
+  const closeBtn = h('button', { type:'button', class:'icon-btn', html:icon('x',15), title:'Отмена (Esc)' });
+  form.append(
+    ta,
+    h('div', { class:'qa-actions' },
+      h('button', { class:'btn primary sm', type:'submit' }, 'Добавить'),
+      closeBtn
+    )
+  );
+  wrapEl.appendChild(form);
+  form.addEventListener('submit', function(ev){
+    ev.preventDefault();
+    const v = ta.value.trim();
+    if (v) addCard(colId, v);
+    ta.value = ''; ta.style.height = 'auto';
+    ui.quickAdd = { colId:colId, text:'' };
+    ta.focus();
+  });
+  ta.addEventListener('input', function(){
+    ui.quickAdd = { colId:colId, text:ta.value };
+    ta.style.height = 'auto';
+    ta.style.height = Math.min(ta.scrollHeight, 140) + 'px';
+  });
+  ta.addEventListener('keydown', function(ev){
+    if (ev.key === 'Enter' && !ev.shiftKey){
+      ev.preventDefault();
+      const v = ta.value.trim();
+      if (v) addCard(colId, v);
+      ta.value = ''; ta.style.height = 'auto';
+      ui.quickAdd = { colId:colId, text:'' };
+      ta.focus();
+    }
+    if (ev.key === 'Escape'){ ev.stopPropagation(); closeQuickAdd(); }
+  });
+  closeBtn.addEventListener('click', function(){ closeQuickAdd(); });
+  wrapEl._ta = ta;
+  return wrapEl;
+}
+function closeQuickAdd(){ ui.quickAdd = null; renderBoard(); }
+function restoreQuickAdd(){
+  const q = ui.quickAdd; if (!q) return;
+  const colEl = document.querySelector('.column[data-col="'+q.colId+'"]');
+  if (!colEl){ ui.quickAdd = null; return; }
+  const qaEl = colEl.querySelector('.qa'); if (!qaEl) return;
+  const newQa = buildQuickAdd(q.colId);
+  qaEl.replaceWith(newQa);
+  const ta = newQa._ta;
+  if (ta){ ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); }
+}
+function openQuickAdd(colId){ ui.quickAdd = { colId:colId, text:'' }; renderBoard(); }
+
+/* ═══════════ Новая колонка ═══════════ */
+function buildAddColumn(){
+  const el = h('div', { class:'add-col' });
+  el.appendChild(h('button', { type:'button', class:'add-col-btn', html:icon('plus',15)+'<span>Добавить колонку</span>' }));
+  return el;
+}
+function openAddColumnForm(btn){
+  const el = btn.closest('.add-col');
+  const form = h('form', { class:'add-col-form' }, h('input', { class:'inp', placeholder:'Название колонки', maxlength:'60' }));
+  el.replaceWith(form);
+  const inp = form.querySelector('input');
+  inp.focus();
+  form.addEventListener('submit', function(ev){
+    ev.preventDefault();
+    const v = inp.value.trim();
+    if (v) addColumn(v); else renderBoard();
+  });
+  inp.addEventListener('keydown', function(ev){
+    if (ev.key === 'Escape'){ ev.stopPropagation(); renderBoard(); }
+  });
+  inp.addEventListener('blur', function(){
+    setTimeout(function(){
+      if (document.body.contains(form) && !inp.value.trim()) renderBoard();
+    }, 150);
+  });
+}
+
+/* ═══════════ Контекстные меню ═══════════ */
+function openMenu(anchor, items){
+  const dd = $('#dropdown');
+  dd.innerHTML = ''; menuArmed = null;
+  items.forEach(function(it){
+    if (it.sep){ dd.appendChild(h('div', { class:'menu-sep' })); return; }
+    if (it.custom){ dd.appendChild(it.custom); return; }
+    const btn = h('button', { type:'button', class:'menu-it' + (it.danger ? ' danger' : '') },
+      it.ic ? h('span', { html:icon(it.ic,15), style:'display:inline-flex' }) : null,
+      h('span', {}, it.label)
+    );
+    btn.addEventListener('click', function(ev){
+      ev.stopPropagation();
+      if (it.confirm && !menuArmed){
+        menuArmed = btn;
+        btn.classList.add('armed');
+        btn.querySelector('span:last-child').textContent = 'Точно удалить?';
+        return;
+      }
+      if (it.onClick) it.onClick();
+    });
+    dd.appendChild(btn);
+  });
+  dd.classList.remove('hidden');
+  const r = anchor.getBoundingClientRect();
+  dd.style.left = '0px'; dd.style.top = '0px';
+  const dw = dd.offsetWidth, dh = dd.offsetHeight;
+  let x = r.left, y = r.bottom + 6;
+  if (x + dw > window.innerWidth - 8) x = Math.max(8, window.innerWidth - dw - 8);
+  if (y + dh > window.innerHeight - 8) y = Math.max(8, r.top - dh - 6);
+  dd.style.left = x + 'px'; dd.style.top = y + 'px';
+}
+function closeMenu(){
+  const dd = $('#dropdown');
+  if (dd.classList.contains('hidden')) return false;
+  dd.classList.add('hidden'); dd.innerHTML = ''; menuArmed = null;
+  return true;
+}
+document.addEventListener('pointerdown', function(e){
+  const dd = $('#dropdown');
+  if (!dd.classList.contains('hidden') && !dd.contains(e.target)) closeMenu();
+}, true);
+
+function openColumnMenu(btn){
+  const colEl = btn.closest('.column'); if (!colEl) return;
+  const colId = colEl.dataset.col;
+  const col = state.columns[colId]; if (!col) return;
+  const cardsCount = columnCards(colId).length;
+  const swatches = h('div', { class:'swatches' });
+  Object.keys(LABELS).forEach(function(k){
+    const sw = h('button', {
+      type:'button',
+      class:'swatch' + (col.color === LABELS[k].color ? ' sel' : ''),
+      style:'background:'+LABELS[k].color, title:LABELS[k].name
+    });
+    sw.addEventListener('click', function(ev){ ev.stopPropagation(); setColumnColor(colId, LABELS[k].color); closeMenu(); });
+    swatches.appendChild(sw);
+  });
+  const none = h('button', { type:'button', class:'swatch none' + (col.color ? '' : ' sel'), title:'Без цвета', html:icon('x',12) });
+  none.addEventListener('click', function(ev){ ev.stopPropagation(); setColumnColor(colId, null); closeMenu(); });
+  swatches.appendChild(none);
+  openMenu(btn, [
+    { label:'Переименовать', ic:'edit', onClick:function(){ closeMenu(); startColumnRename(colId); } },
+    { custom: h('div', { class:'menu-cap' }, 'Цвет метки колонки') },
+    { custom: swatches },
+    { sep:true },
+    { label:'Удалить колонку' + (cardsCount ? ' (' + cardsCount + ')' : ''), ic:'trash', danger:true, confirm:true,
+      onClick:function(){ closeMenu(); deleteColumn(colId); } }
+  ]);
+}
+function openCardMenu(btn){
+  const cardEl = btn.closest('.card'); if (!cardEl) return;
+  const id = cardEl.dataset.card;
+  openMenu(btn, [
+    { label:'Открыть', ic:'edit', onClick:function(){ closeMenu(); openCardModal(id); } },
+    { sep:true },
+    { label:'Удалить карточку', ic:'trash', danger:true, confirm:true, onClick:function(){ closeMenu(); deleteCard(id); } }
+  ]);
+}
+
+/* ═══════════ Делегирование кликов на доске ═══════════ */
+function bindBoardClicks(){
+  $('#columns').addEventListener('click', function(e){
+    const qaBtn = e.target.closest('.qa-btn');
+    if (qaBtn){ openQuickAdd(qaBtn.closest('.qa').dataset.qa); return; }
+    const addColBtn = e.target.closest('.add-col-btn');
+    if (addColBtn){ openAddColumnForm(addColBtn); return; }
+    const colMenu = e.target.closest('.col-menu-btn');
+    if (colMenu){ openColumnMenu(colMenu); return; }
+    const cardMenuBtn = e.target.closest('.card-menu-btn');
+    if (cardMenuBtn){ e.stopPropagation(); openCardMenu(cardMenuBtn); return; }
+    const cardEl = e.target.closest('.card');
+    if (cardEl){
+      if (Date.now() < suppressClickUntil) return;
+      openCardModal(cardEl.dataset.card);
+    }
+  });
+  $('#columns').addEventListener('dblclick', function(e){
+    const nameEl = e.target.closest('.col-name');
+    if (nameEl) startColumnRename(nameEl.closest('.column').dataset.col);
+  });
+}
+function startColumnRename(colId){
+  const col = state.columns[colId]; if (!col) return;
+  const nameEl = document.querySelector('.column[data-col="'+colId+'"] .col-name');
+  if (!nameEl) return;
+  const inp = h('input', { class:'inp', style:'height:26px;padding:0 6px;font-size:14px;font-weight:600;min-width:0', value:col.title, maxlength:'60' });
+  nameEl.replaceWith(inp);
+  inp.focus(); inp.select();
+  let done = false;
+  const commit = function(){
+    if (done) return; done = true;
+    const v = inp.value.trim();
+    if (v && v !== col.title) renameColumn(colId, v); else renderBoard();
+  };
+  inp.addEventListener('keydown', function(ev){
+    if (ev.key === 'Enter'){ ev.preventDefault(); commit(); }
+    if (ev.key === 'Escape'){ done = true; renderBoard(); }
+  });
+  inp.addEventListener('blur', commit);
+}
+
+/* ═══════════ Drag & Drop (pointer events: мышь + тач) ═══════════ */
+function bindDragAndDrop(){
+  const board = $('#columns');
+  board.addEventListener('pointerdown', function(e){
+    if (dragCtx) return;
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    const cardEl = e.target.closest('.card');
+    if (cardEl && !e.target.closest('button, input, textarea, .card-menu-btn')){
+      startPress(e, { type:'card', id:cardEl.dataset.card, el:cardEl });
+      return;
+    }
+    const grip = e.target.closest('.col-grip');
+    if (grip){
+      const colEl = grip.closest('.column');
+      if (colEl) startPress(e, { type:'column', id:colEl.dataset.col, el:colEl });
+    }
+  });
+  document.addEventListener('touchmove', function(e){
+    if (dragCtx && dragCtx.started) e.preventDefault();
+  }, { passive:false });
+  document.addEventListener('contextmenu', function(e){
+    if (dragCtx && dragCtx.started) e.preventDefault();
+  });
+}
+function detachDragListeners(){
+  document.removeEventListener('pointermove', onDragMove);
+  document.removeEventListener('pointerup', onDragUp);
+  document.removeEventListener('pointercancel', onDragCancel);
+}
+function startPress(e, info){
+  dragCtx = {
+    type:info.type, id:info.id, el:info.el,
+    startX:e.clientX, startY:e.clientY, lastX:e.clientX, lastY:e.clientY,
+    pointerId:e.pointerId, pType:e.pointerType || 'mouse',
+    started:false, raf:0, pi:-1, hoverCol:null
+  };
+  document.addEventListener('pointermove', onDragMove);
+  document.addEventListener('pointerup', onDragUp);
+  document.addEventListener('pointercancel', onDragCancel);
+  if (dragCtx.pType !== 'mouse'){
+    dragCtx.lpTimer = setTimeout(function(){ if (dragCtx && !dragCtx.started) beginDrag(); }, 230);
+  }
+}
+function onDragMove(e){
+  if (!dragCtx || e.pointerId !== dragCtx.pointerId) return;
+  dragCtx.lastX = e.clientX; dragCtx.lastY = e.clientY;
+  if (dragCtx.started) return;
+  const dist = Math.abs(e.clientX - dragCtx.startX) + Math.abs(e.clientY - dragCtx.startY);
+  if (dragCtx.pType === 'mouse'){
+    if (dist > 5) beginDrag();
+  } else if (dist > 10){
+    clearTimeout(dragCtx.lpTimer);
+    dragCtx = null; detachDragListeners();
+  }
+}
+function onDragUp(e){
+  if (!dragCtx || e.pointerId !== dragCtx.pointerId) return;
+  clearTimeout(dragCtx.lpTimer);
+  const ctx = dragCtx; dragCtx = null; detachDragListeners();
+  if (ctx.started) finishDrag(ctx);
+}
+function onDragCancel(e){
+  if (!dragCtx || e.pointerId !== dragCtx.pointerId) return;
+  clearTimeout(dragCtx.lpTimer);
+  const ctx = dragCtx; dragCtx = null; detachDragListeners();
+  if (ctx.started) cancelDrag(ctx);
+}
+function beginDrag(){
+  const ctx = dragCtx; if (!ctx || ctx.started) return;
+  ctx.started = true;
+  const r = ctx.el.getBoundingClientRect();
+  ctx.offX = ctx.lastX - r.left; ctx.offY = ctx.lastY - r.top;
+  document.body.classList.add('dragging-active');
+  try { ctx.el.setPointerCapture(ctx.pointerId); } catch(err){}
+  if (navigator.vibrate) try { navigator.vibrate(12); } catch(err){}
+  if (ctx.type === 'card'){
+    const g = ctx.el.cloneNode(true);
+    g.classList.remove('card-enter');
+    g.classList.add('drag-ghost');
+    g.style.width = r.width + 'px';
+    document.body.appendChild(g);
+    ctx.ghost = g;
+    ctx.placeholder = h('div', { class:'drop-placeholder' });
+    ctx.placeholder.style.height = r.height + 'px';
+  } else {
+    const gh = Math.min(r.height, window.innerHeight - 30);
+    const g = ctx.el.cloneNode(true);
+    g.classList.remove('drag-over');
+    g.classList.add('drag-ghost-col');
+    g.style.width = r.width + 'px';
+    g.style.height = gh + 'px';
+    document.body.appendChild(g);
+    ctx.ghost = g;
+    ctx.placeholder = h('div', { class:'col-placeholder' });
+    ctx.placeholder.style.width = r.width + 'px';
+    ctx.placeholder.style.height = gh + 'px';
+  }
+  ctx.el.classList.add('drag-origin');
+  ctx.el.parentNode.insertBefore(ctx.placeholder, ctx.el);
+  ctx.el.style.display = 'none';
+  positionGhost(ctx);
+  ctx.raf = requestAnimationFrame(dragFrame);
+}
+function positionGhost(ctx){
+  if (!ctx.ghost) return;
+  const w = ctx.ghost.offsetWidth, hh = ctx.ghost.offsetHeight;
+  let x = ctx.lastX - ctx.offX, y = ctx.lastY - ctx.offY;
+  x = Math.max(4, Math.min(x, window.innerWidth - w - 4));
+  y = Math.max(4, Math.min(y, window.innerHeight - hh - 4));
+  ctx.ghost.style.left = x + 'px';
+  ctx.ghost.style.top = y + 'px';
+}
+function dragFrame(){
+  const ctx = dragCtx;
+  if (!ctx || !ctx.started) return;
+  positionGhost(ctx);
+  if (ctx.type === 'card') hitTestCards(ctx); else hitTestColumns(ctx);
+  edgeScroll(ctx);
+  ctx.raf = requestAnimationFrame(dragFrame);
+}
+function hoveredColumn(ctx){
+  if (ctx.hoverCol && document.body.contains(ctx.hoverCol)){
+    const r = ctx.hoverCol.getBoundingClientRect();
+    if (ctx.lastX >= r.left - 5 && ctx.lastX <= r.right + 5) return ctx.hoverCol;
+  }
+  let found = null;
+  $$('#columns .column').forEach(function(ce){
+    const r = ce.getBoundingClientRect();
+    if (ctx.lastX >= r.left - 5 && ctx.lastX <= r.right + 5) found = ce;
+  });
+  ctx.hoverCol = found;
+  return found;
+}
+function hitTestCards(ctx){
+  const hover = hoveredColumn(ctx);
+  $$('#columns .column').forEach(function(ce){ ce.classList.toggle('drag-over', ce === hover); });
+  if (!hover) return;
+  const list = hover.querySelector('.col-cards');
+  const items = Array.prototype.filter.call(list.children, function(el){ return el.classList.contains('card'); });
+  let idx = items.length;
+  for (let i = 0; i < items.length; i++){
+    const r = items[i].getBoundingClientRect();
+    if (ctx.lastY < r.top + r.height / 2){ idx = i; break; }
+  }
+  const ph = ctx.placeholder;
+  if (ph.parentNode !== list || ctx.pi !== idx){
+    if (idx >= items.length) list.appendChild(ph);
+    else list.insertBefore(ph, items[idx]);
+    ctx.pi = idx;
+    $$('#columns .col-cards').forEach(function(l){
+      const es = l.querySelector('.empty-col');
+      if (es) es.style.display = (l.querySelector('.card') || l.contains(ph)) ? 'none' : '';
+    });
+  }
+}
+function hitTestColumns(ctx){
+  const wrap = $('#columns');
+  const items = Array.prototype.filter.call(wrap.children, function(el){ return el.classList.contains('column'); });
+  let idx = items.length;
+  for (let i = 0; i < items.length; i++){
+    const r = items[i].getBoundingClientRect();
+    if (ctx.lastX < r.left + r.width / 2){ idx = i; break; }
+  }
+  const ph = ctx.placeholder;
+  if (ctx.pi !== idx){
+    if (idx >= items.length){
+      const ac = wrap.querySelector('.add-col, .add-col-form');
+      wrap.insertBefore(ph, ac || null);
+    } else wrap.insertBefore(ph, items[idx]);
+    ctx.pi = idx;
+  }
+}
+function edgeScroll(ctx){
+  const wrap = $('#columns');
+  const wr = wrap.getBoundingClientRect();
+  const x = ctx.lastX, y = ctx.lastY;
+  if (x < wr.left + 50) wrap.scrollLeft -= 16;
+  else if (x > wr.right - 50) wrap.scrollLeft += 16;
+  const col = ctx.hoverCol;
+  if (!col) return;
+  const list = col.querySelector('.col-cards');
+  if (!list) return;
+  const lr = list.getBoundingClientRect();
+  if (y < lr.top + 44) list.scrollTop -= 12;
+  else if (y > lr.bottom - 44) list.scrollTop += 12;
+}
+function visibleCardSibling(ph, dir){
+  let el = dir === 'prev' ? ph.previousElementSibling : ph.nextElementSibling;
+  while (el && (!el.classList.contains('card') || el.classList.contains('drag-origin'))){
+    el = dir === 'prev' ? el.previousElementSibling : el.nextElementSibling;
+  }
+  return el;
+}
+function columnSibling(ph, dir){
+  let el = dir === 'prev' ? ph.previousElementSibling : ph.nextElementSibling;
+  while (el && (!el.classList.contains('column') || el.classList.contains('drag-origin'))){
+    el = dir === 'prev' ? el.previousElementSibling : el.nextElementSibling;
+  }
+  return el;
+}
+function cleanupDragArtifacts(ctx){
+  if (ctx.ghost) ctx.ghost.remove();
+  if (ctx.placeholder && ctx.placeholder.parentNode) ctx.placeholder.remove();
+  ctx.el.style.display = '';
+  ctx.el.classList.remove('drag-origin');
+}
+function finishDrag(ctx){
+  cancelAnimationFrame(ctx.raf);
+  $$('#columns .column').forEach(function(c){ c.classList.remove('drag-over'); });
+  document.body.classList.remove('dragging-active');
+  suppressClickUntil = Date.now() + 300;
+  const ph = ctx.placeholder;
+  if (ctx.type === 'card'){
+    const list = ph.parentNode;
+    const colEl = list.closest('.column');
+    const targetColId = colEl ? colEl.dataset.col : null;
+    const prevEl = visibleCardSibling(ph, 'prev');
+    const nextEl = visibleCardSibling(ph, 'next');
+    const prev = (prevEl && state.cards[prevEl.dataset.card]) || null;
+    const next = (nextEl && state.cards[nextEl.dataset.card]) || null;
+    cleanupDragArtifacts(ctx);
+    if (targetColId) moveCardByOrder(ctx.id, targetColId, orderBetween(prev, next));
+    else renderBoard();
+  } else {
+    /* Индекс считаем по соседям плейсхолдера среди ЖИВЫХ колонок —
+       скрытая перетаскиваемая колонка и сам плейсхолдер (класс col-placeholder)
+       в общий список не входят. Раньше здесь был indexOf(ph) по списку .column,
+       который всегда давал -1 — из-за этого колонка всегда уезжала в конец. */
+    const prevEl = columnSibling(ph, 'prev');
+    const nextEl = columnSibling(ph, 'next');
+    const others = sortedColumns().map(function(c){ return c.id; }).filter(function(id){ return id !== ctx.id; });
+    let idx;
+    if (prevEl && state.columns[prevEl.dataset.col]) idx = others.indexOf(prevEl.dataset.col) + 1;
+    else if (nextEl && state.columns[nextEl.dataset.col]) idx = Math.max(0, others.indexOf(nextEl.dataset.col));
+    else idx = others.length;
+    cleanupDragArtifacts(ctx);
+    moveColumnById(ctx.id, idx);
+  }
+  if (pendingRemote){ const raw = pendingRemote; pendingRemote = null; onRemoteState(raw); }
+}
+function cancelDrag(ctx){
+  cancelAnimationFrame(ctx.raf);
+  cleanupDragArtifacts(ctx);
+  $$('#columns .column').forEach(function(c){ c.classList.remove('drag-over'); });
+  document.body.classList.remove('dragging-active');
+  suppressClickUntil = Date.now() + 300;
+  if (pendingRemote){ const raw = pendingRemote; pendingRemote = null; onRemoteState(raw); }
+}
+
+/* ═══════════ Модалка карточки ═══════════ */
+function openCardModal(id){
+  const card = state.cards[id]; if (!card) return;
+  cm = { cardId:id, labels:card.labels.slice(), assignee:card.assignee, priority:card.priority||null, dirty:false };
+  $('#cmTitle').value = card.title;
+  $('#cmDesc').value = card.description || '';
+  $('#cmDue').value = card.dueDate || '';
+  $('#cmStart').value = card.startAt || '';
+  $('#cmEnd').value = card.endAt || '';
+  $('#cmCost').value = card.cost || '';
+  $('#cmCreated').textContent = fmtFull(card.createdAt);
+  $('#cmSaved').classList.remove('show');
+  const delBtn = $('#cmDelete');
+  delBtn.classList.remove('armed');
+  delBtn.innerHTML = icon('trash',15) + '<span>Удалить</span>';
+  hideAddCheckInput();
+  renderCmLabels(); renderCmAssignee(); renderCmChecklist(); renderCmPriority(); renderCmPay();
+  $('#cardModal').classList.remove('hidden');
+  if (!card.title) setTimeout(function(){ $('#cmTitle').focus(); }, 60);
+}
+function renderCmPriority(){
+  if (!cm) return;
+  const box = $('#cmPriority'); box.innerHTML = '';
+  [['','Нет'],['low','Низкий'],['med','Средний'],['high','Высокий']].forEach(function(o){
+    const val = o[0] || null;
+    const btn = h('button', { type:'button', class:'chip' + ((cm.priority||null) === val ? ' sel' : '') });
+    if (val) btn.appendChild(h('span', { class:'dot', style:'background:'+PRIORITY[val].color }));
+    btn.appendChild(h('span', {}, o[1]));
+    btn.addEventListener('click', function(){ cm.priority = val; cm.dirty = true; renderCmPriority(); });
+    box.appendChild(btn);
+  });
+}
+function renderCmPay(){
+  const box = $('#cmPay');
+  if (!box || !cm) return;
+  const card = state.cards[cm.cardId];
+  if (!card){ box.innerHTML = ''; return; }
+  box.innerHTML = '';
+  const cost = Number($('#cmCost').value) || 0;
+  if (card.paidEntryId){
+    box.appendChild(h('div', { class:'pay-done' },
+      h('span', { html:icon('check',13), style:'display:inline-flex' }),
+      h('span', {}, 'Оплачено из копилки' + (card.paidAt ? ' · ' + fmtFull(card.paidAt) : '') + (card.paidBy ? ' · ' + kopName(card.paidBy) : ''))
+    ));
+    const undo = h('button', { type:'button', class:'btn ghost sm', style:'margin-top:8px' }, 'Отменить оплату');
+    undo.addEventListener('click', function(){ undoPayment(card); });
+    box.appendChild(undo);
+    return;
+  }
+  if (!(cost > 0)){
+    box.appendChild(h('p', { class:'fld-note', style:'margin-top:6px' }, 'Укажите стоимость — когда задача будет сделана, её можно списать из копилки как расход.'));
+    return;
+  }
+  if (!finRoom()){
+    box.appendChild(h('p', { class:'fld-note', style:'margin-top:6px' }, 'Чтобы списать деньги, укажите код комнаты копилки (тот же, что во вкладке «Копилка»):'));
+    const row = h('div', { class:'pay-room' });
+    const inp = h('input', { class:'inp', placeholder:'например sasha-dinara-8f3k9x', value: finRoom() });
+    const btn = h('button', { type:'button', class:'btn primary sm', style:'flex-shrink:0' }, 'Сохранить');
+    btn.addEventListener('click', function(){
+      const code = sanitizeRoom(inp.value);
+      if (code.length < 6){ inp.style.borderColor = 'var(--danger)'; inp.focus(); return; }
+      inp.style.borderColor = '';
+      localStorage.setItem(FIN_ROOM_KEY, code);
+      finSubscribe();
+      renderCmPay();
+    });
+    inp.addEventListener('keydown', function(ev){ if (ev.key === 'Enter'){ ev.preventDefault(); btn.click(); } });
+    row.append(inp, btn);
+    box.appendChild(row);
+    return;
+  }
+  if (dbUrl() && !fbMode){
+    box.appendChild(h('p', { class:'fld-note', style:'margin-top:6px' }, 'Подключение к Firebase…'));
+    return;
+  }
+  const idn = identityOf();
+  const opts = (idn === 'husband' || idn === 'wife') ? [idn] : ['husband','wife'];
+  const row = h('div', { class:'pay-btns' });
+  opts.forEach(function(p){
+    const b = h('button', { type:'button', class:'btn primary sm' });
+    b.appendChild(avatarEl(p));
+    b.appendChild(h('span', {}, '−' + fmtMoneyRu(cost) + ' · ' + (p === 'wife' ? meta().wifeName : meta().husbandName)));
+    b.addEventListener('click', function(){ payFromFinance(card, cost, p); });
+    row.appendChild(b);
+  });
+  box.appendChild(row);
+  box.appendChild(h('p', { class:'fld-note', style:'margin-top:6px' }, 'Появится в истории копилки как расход и пометит задачу оплаченной.'));
+}
+function payFromFinance(card, cost, personKey){
+  if (dbUrl() && !fbMode){
+    alert('Копилка ещё подключается к Firebase — попробуйте через несколько секунд.');
+    return;
+  }
+  if (cm && cm.cardId === card.id) saveCardModal(); // сначала сохраняем несохранённые правки (в т.ч. стоимость)
+  const who = KOP_WHO[personKey] || 'sasha';
+  const amount = -Math.abs(Math.round(Number(cost) * 100) / 100);
+  const entry = {
+    amount: amount,
+    note: ('Задача: ' + card.title).slice(0,80),
+    who: who, cardId: card.id,
+    createdAt: Date.now(), updatedAt: Date.now()
+  };
+  finAddEntry(entry, function(key){
+    updateCard(card.id, { paidEntryId: key || ('local_' + Date.now()), paidBy: who, paidAt: entry.createdAt });
+    if (cm && cm.cardId === card.id) renderCmPay();
+    flashSaved();
+  });
+}
+function undoPayment(card){
+  if (!confirm('Отменить оплату? Запись о расходе будет удалена из копилки.')) return;
+  if (card.paidEntryId && card.paidEntryId.indexOf('local_') !== 0) finRemoveEntry(card.paidEntryId);
+  updateCard(card.id, { paidEntryId: null, paidBy: null, paidAt: 0 });
+  if (cm && cm.cardId === card.id) renderCmPay();
+}
+const cmPayDebounced = debounce(renderCmPay, 250);
+function renderCmLabels(){
+  const box = $('#cmLabels'); box.innerHTML = '';
+  Object.keys(LABELS).forEach(function(k){
+    const sel = cm.labels.indexOf(k) >= 0;
+    const chip = h('button', { type:'button', class:'chip' + (sel ? ' sel' : '') },
+      h('span', { class:'dot', style:'background:'+LABELS[k].color }),
+      h('span', {}, LABELS[k].name),
+      sel ? h('span', { html:icon('check',12), style:'display:inline-flex' }) : null
+    );
+    chip.addEventListener('click', function(){
+      const i = cm.labels.indexOf(k);
+      if (i >= 0) cm.labels.splice(i, 1);
+      else {
+        if (cm.labels.length >= 3){
+          chip.classList.add('shake');
+          setTimeout(function(){ chip.classList.remove('shake'); }, 350);
+          return;
+        }
+        cm.labels.push(k);
+      }
+      cm.dirty = true; renderCmLabels();
+    });
+    box.appendChild(chip);
+  });
+}
+function renderCmAssignee(){
+  const box = $('#cmAssignee'); box.innerHTML = '';
+  [['', 'Никто'], ['husband', meta().husbandName], ['wife', meta().wifeName], ['both', 'Оба']].forEach(function(o){
+    const val = o[0];
+    const btn = h('button', { type:'button', class:'asg-opt' + (cm.assignee === (val || null) ? ' sel' : '') });
+    if (val) btn.appendChild(avatarEl(val));
+    btn.appendChild(h('span', {}, o[1]));
+    btn.addEventListener('click', function(){ cm.assignee = val || null; cm.dirty = true; renderCmAssignee(); });
+    box.appendChild(btn);
+  });
+}
+function renderCmChecklist(){
+  if (!cm) return;
+  const card = state.cards[cm.cardId]; if (!card) return;
+  const box = $('#cmChecklist'); box.innerHTML = '';
+  const items = card.checklist;
+  const total = items.length;
+  const done = items.filter(function(i){ return i.done; }).length;
+  $('#cmCheckCount').textContent = total ? '  ' + done + '/' + total : '';
+  const prog = $('#cmProgress');
+  prog.style.display = total ? 'block' : 'none';
+  prog.firstElementChild.style.width = (total ? Math.round(done / total * 100) : 0) + '%';
+  items.forEach(function(item){
+    const row = h('div', { class:'check-item' + (item.done ? ' done' : '') });
+    const cb = h('span', { class:'custom-cb', html:icon('check',11) });
+    cb.addEventListener('click', function(){
+      item.done = !item.done;
+      updateCard(card.id, { checklist: items.slice() });
+      renderCmChecklist();
+    });
+    const txt = h('span', { class:'ci-text' + (item.done ? ' done' : ''), title:'Нажмите, чтобы изменить' }, item.text);
+    txt.addEventListener('click', function(){ if (!cm) return; editCheckItem(card, item, txt); });
+    const del = h('button', { type:'button', class:'icon-btn', html:icon('x',13), title:'Удалить пункт' });
+    del.addEventListener('click', function(){
+      const idx = items.indexOf(item);
+      if (idx >= 0) items.splice(idx, 1);
+      updateCard(card.id, { checklist: items.slice() });
+      renderCmChecklist();
+    });
+    row.append(cb, txt, del);
+    box.appendChild(row);
+  });
+}
+function editCheckItem(card, item, txtEl){
+  const inp = h('input', { class:'inp ci-inp', value:item.text, maxlength:'200' });
+  txtEl.replaceWith(inp);
+  inp.focus(); inp.select();
+  let done = false;
+  const commit = function(){
+    if (done) return; done = true;
+    const v = inp.value.trim();
+    if (v && v !== item.text){
+      item.text = v;
+      updateCard(card.id, { checklist: card.checklist.slice() });
+    }
+    renderCmChecklist();
+  };
+  inp.addEventListener('keydown', function(ev){
+    if (ev.key === 'Enter'){ ev.preventDefault(); commit(); }
+    if (ev.key === 'Escape'){ done = true; renderCmChecklist(); }
+  });
+  inp.addEventListener('blur', commit);
+}
+function hideAddCheckInput(){
+  $('#cmAddCheckInput').classList.add('hidden');
+  $('#cmAddCheckInput').value = '';
+  $('#cmAddCheck').classList.remove('hidden');
+}
+function saveCardModal(){
+  if (!cm) return false;
+  const card = state.cards[cm.cardId];
+  if (!card){ cm = null; $('#cardModal').classList.add('hidden'); return false; }
+  const patch = {};
+  const title = $('#cmTitle').value.trim() || 'Без названия';
+  if (title !== card.title) patch.title = title;
+  if ($('#cmDesc').value !== card.description) patch.description = $('#cmDesc').value;
+  const due = $('#cmDue').value || null;
+  if (due !== card.dueDate) patch.dueDate = due;
+  const st = $('#cmStart').value ? $('#cmStart').value.slice(0,16) : null;
+  if (st !== (card.startAt || null)) patch.startAt = st;
+  const en = $('#cmEnd').value ? $('#cmEnd').value.slice(0,16) : null;
+  if (en !== (card.endAt || null)) patch.endAt = en;
+  if ((cm.priority || null) !== (card.priority || null)) patch.priority = cm.priority || null;
+  const costRaw = parseFloat($('#cmCost').value);
+  const cost = (isFinite(costRaw) && costRaw > 0) ? Math.round(costRaw*100)/100 : null;
+  if (cost !== (card.cost || null)) patch.cost = cost;
+  if (JSON.stringify(cm.labels) !== JSON.stringify(card.labels)) patch.labels = cm.labels.slice();
+  if ((cm.assignee || null) !== card.assignee) patch.assignee = cm.assignee || null;
+  if (Object.keys(patch).length){ updateCard(cm.cardId, patch); return true; }
+  return false;
+}
+function closeCardModal(){
+  if (cm && cm.dirty) saveCardModal();
+  cm = null;
+  $('#cardModal').classList.add('hidden');
+}
+function flashSaved(){
+  const s = $('#cmSaved');
+  s.classList.add('show');
+  setTimeout(function(){ s.classList.remove('show'); }, 1400);
+}
+function syncModalWithRemote(){
+  if (!cm) return;
+  const card = state.cards[cm.cardId];
+  if (!card){
+    if (!cm.dirty){ cm = null; $('#cardModal').classList.add('hidden'); }
+    return;
+  }
+  if (cm.dirty) return;
+  const ae = document.activeElement;
+  if (ae && $('#cardModal').contains(ae)) return;
+  $('#cmTitle').value = card.title;
+  $('#cmDesc').value = card.description || '';
+  $('#cmDue').value = card.dueDate || '';
+  $('#cmStart').value = card.startAt || '';
+  $('#cmEnd').value = card.endAt || '';
+  $('#cmCost').value = card.cost || '';
+  cm.labels = card.labels.slice();
+  cm.assignee = card.assignee;
+  cm.priority = card.priority || null;
+  renderCmLabels(); renderCmAssignee(); renderCmChecklist(); renderCmPriority(); renderCmPay();
+}
+function bindCardModal(){
+  $('#cmTitle').addEventListener('input', function(){ if (cm) cm.dirty = true; });
+  $('#cmDesc').addEventListener('input', function(){ if (cm) cm.dirty = true; });
+  $('#cmDue').addEventListener('input', function(){ if (cm) cm.dirty = true; });
+  $('#cmDue').addEventListener('change', function(){ if (cm) cm.dirty = true; });
+  $('#cmStart').addEventListener('input', function(){ if (cm) cm.dirty = true; });
+  $('#cmStart').addEventListener('change', function(){ if (cm) cm.dirty = true; });
+  $('#cmEnd').addEventListener('input', function(){ if (cm) cm.dirty = true; });
+  $('#cmEnd').addEventListener('change', function(){ if (cm) cm.dirty = true; });
+  $('#cmCost').addEventListener('input', function(){ if (cm){ cm.dirty = true; cmPayDebounced(); } });
+  $$('#cardModal [data-start]').forEach(function(b){
+    b.addEventListener('click', function(){
+      const base = $('#cmStart').value;
+      const time = base ? base.slice(11,16) : '09:00';
+      $('#cmStart').value = dateStrOffset(Number(b.dataset.start)) + 'T' + time;
+      if (cm) cm.dirty = true;
+    });
+  });
+  $('#cmStartClear').addEventListener('click', function(){ $('#cmStart').value = ''; if (cm) cm.dirty = true; });
+  $$('#cardModal [data-endh]').forEach(function(b){
+    b.addEventListener('click', function(){
+      $('#cmEnd').value = addHoursIso($('#cmEnd').value || $('#cmStart').value, Number(b.dataset.endh));
+      if (cm) cm.dirty = true;
+    });
+  });
+  $('#cmEndClear').addEventListener('click', function(){ $('#cmEnd').value = ''; if (cm) cm.dirty = true; });
+  $$('#cardModal [data-due]').forEach(function(b){
+    b.addEventListener('click', function(){
+      $('#cmDue').value = dateStrOffset(Number(b.dataset.due));
+      if (cm) cm.dirty = true;
+    });
+  });
+  $('#cmDueClear').addEventListener('click', function(){ $('#cmDue').value = ''; if (cm) cm.dirty = true; });
+  $('#cmAddCheck').addEventListener('click', function(){
+    $('#cmAddCheck').classList.add('hidden');
+    const inp = $('#cmAddCheckInput');
+    inp.classList.remove('hidden');
+    inp.focus();
+  });
+  $('#cmAddCheckInput').addEventListener('keydown', function(ev){
+    ev.stopPropagation();
+    if (ev.key === 'Enter'){
+      ev.preventDefault();
+      if (!cm) return;
+      const card = state.cards[cm.cardId];
+      const v = $('#cmAddCheckInput').value.trim();
+      if (card && v){
+        card.checklist.push({ id:uid('i'), text:v.slice(0,200), done:false });
+        updateCard(card.id, { checklist:card.checklist.slice() });
+      }
+      $('#cmAddCheckInput').value = '';
+      $('#cmAddCheckInput').focus();
+      renderCmChecklist();
+    }
+    if (ev.key === 'Escape'){ hideAddCheckInput(); }
+  });
+  $('#cmAddCheckInput').addEventListener('blur', function(){ setTimeout(hideAddCheckInput, 140); });
+  $('#cmSave').addEventListener('click', function(){
+    if (saveCardModal()){ if (cm) cm.dirty = false; flashSaved(); }
+    else closeCardModal();
+  });
+  $('#cmDelete').addEventListener('click', function(){
+    if (!cm) return;
+    const btn = $('#cmDelete');
+    if (!btn.classList.contains('armed')){
+      btn.classList.add('armed');
+      btn.innerHTML = '<span>Точно удалить?</span>';
+      setTimeout(function(){
+        btn.classList.remove('armed');
+        btn.innerHTML = icon('trash',15) + '<span>Удалить</span>';
+      }, 4000);
+      return;
+    }
+    const id = cm.cardId;
+    cm = null;
+    $('#cardModal').classList.add('hidden');
+    deleteCard(id);
+  });
+  $('#cmClose').addEventListener('click', closeCardModal);
+  $('#cardModal').addEventListener('pointerdown', function(e){ if (e.target === $('#cardModal')) closeCardModal(); });
+}
+
+/* ═══════════ Копилка: данные ═══════════ */
+function saveFinLocal(){ try { localStorage.setItem(LS.fin, JSON.stringify(finEntries)); } catch(e){} }
+function finSubscribe(){
+  if (finUnsub){ finUnsub(); finUnsub = null; }
+  finEntries = {}; finEditId = null;
+  const room = finRoom();
+  if (!room) return;
+  if (fbMode && db){
+    const r = db.ref('rooms/' + room + '/entries');
+    const cb = function(snap){ finEntries = snap.val() || {}; if (ui.view === 'finance') renderFinance(); };
+    const errCb = function(err){ console.warn('Finance FB:', err); };
+    r.on('value', cb, errCb);
+    finUnsub = function(){ r.off('value', cb); };
+  } else if (!dbUrl()){
+    try { finEntries = JSON.parse(localStorage.getItem(LS.fin) || '{}'); } catch(e){ finEntries = {}; }
+  }
+  if (ui.view === 'finance') renderFinance();
+}
+function finAddEntry(entry, cb){
+  const room = finRoom();
+  if (fbMode && db && room){
+    let key = null;
+    try {
+      const r = db.ref('rooms/' + room + '/entries').push(entry, function(err){ if (err) console.warn(err); });
+      key = r.key;
+    } catch(e){ console.warn(e); }
+    if (cb) cb(key);
+  } else {
+    const id = uid('fin');
+    finEntries[id] = entry;
+    saveFinLocal();
+    if (ui.view === 'finance') renderFinance();
+    if (cb) cb(id);
+  }
+}
+function finRemoveEntry(id){
+  if (!id) return;
+  const room = finRoom();
+  if (fbMode && db && room){
+    try { db.ref('rooms/' + room + '/entries/' + id).remove(); } catch(e){ console.warn(e); }
+  } else {
+    delete finEntries[id];
+    saveFinLocal();
+    if (ui.view === 'finance') renderFinance();
+  }
+}
+function finUpdateEntry(id, patch){
+  const room = finRoom();
+  if (fbMode && db && room){
+    try { db.ref('rooms/' + room + '/entries/' + id).update(patch); } catch(e){ console.warn(e); }
+  } else if (finEntries[id]){
+    Object.assign(finEntries[id], patch);
+    saveFinLocal();
+    if (ui.view === 'finance') renderFinance();
+  }
+}
+
+/* ═══════════ Копилка: рендер ═══════════ */
+function renderFinance(){
+  const view = $('#financeView'); if (!view || !state) return;
+  const room = finRoom();
+  $('#finRoomCode').textContent = room || '—';
+  const setup = $('#finSetup'), main = $('#finMain'), noteEl = $('#finLocalNote');
+  if (!room){
+    setup.classList.remove('hidden'); main.classList.add('hidden'); noteEl.classList.add('hidden');
+    return;
+  }
+  setup.classList.add('hidden'); main.classList.remove('hidden');
+  if (!dbUrl()){
+    noteEl.classList.remove('hidden');
+    noteEl.textContent = 'Локальный режим: операции копилки хранятся только на этом устройстве. Вставьте URL Firebase в FIREBASE_CONFIG в начале файла, чтобы включить синхронизацию.';
+  } else if (!fbMode){
+    noteEl.classList.remove('hidden');
+    noteEl.textContent = 'Подключение к Firebase…';
+  } else {
+    noteEl.classList.add('hidden');
+  }
+  const ids = Object.keys(finEntries);
+  let total = 0;
+  const per = { sasha:{add:0,with:0}, dinara:{add:0,with:0} };
+  ids.forEach(function(id){
+    const e = finEntries[id] || {};
+    const a = Number(e.amount) || 0;
+    total += a;
+    const k = (e.who === 'sasha' || e.who === 'dinara') ? e.who : null;
+    if (k){ if (a >= 0) per[k].add += a; else per[k].with += Math.abs(a); }
+  });
+  const tv = $('#finTotal');
+  tv.textContent = (total < 0 ? '−' : '') + fmtMoneyRu(total);
+  tv.classList.toggle('negative', total < 0);
+  $('#finPills').innerHTML = ['dinara','sasha'].map(function(k){
+    const net = per[k].add - per[k].with;
+    const initial = (kopName(k).trim()[0] || '?').toUpperCase();
+    return '<span class="fin-pill"><span class="avatar ' + kopAvatar(k) + '">' + esc(initial) + '</span>' + esc(kopName(k)) + '&nbsp;<b>' + (net >= 0 ? '+' : '−') + fmtMoneyRu(net) + '</b></span>';
+  }).join('');
+  let pSum = 0, pN = 0;
+  Object.keys(state.cards).forEach(function(id){
+    const c = state.cards[id];
+    if (c.cost && !c.paidEntryId){ pSum += c.cost; pN++; }
+  });
+  $('#finPlanned').innerHTML = pN
+    ? 'Запланировано по задачам: <b>' + fmtMoneyRu(pSum) + '</b> · ' + pN + ' ' + plural(pN,'задача','задачи','задач') + ' без оплаты'
+    : 'Расходы по задачам: ничего не запланировано';
+  $('#finWhoWife').textContent = meta().wifeName;
+  $('#finWhoHusband').textContent = meta().husbandName;
+  $('#finWhoWifeAv').textContent = (meta().wifeName.trim()[0] || 'Ж').toUpperCase();
+  $('#finWhoHusbandAv').textContent = (meta().husbandName.trim()[0] || 'М').toUpperCase();
+  $('#finCount').textContent = ids.length + ' ' + plural(ids.length, 'операция','операции','операций');
+  const list = $('#finList');
+  if (!ids.length){
+    list.innerHTML = '<div class="fin-empty">Пока пусто — отложите первые деньги или оплатите задачу из карточки</div>';
+    return;
+  }
+  ids.sort(function(a,b){ return (finEntries[b].createdAt || 0) - (finEntries[a].createdAt || 0); });
+  list.innerHTML = ids.map(function(id){
+    const e = finEntries[id] || {};
+    const a = Number(e.amount) || 0;
+    const pos = a >= 0;
+    if (id === finEditId){
+      return '<div class="fin-row" data-fin="'+id+'">' +
+        '<div class="fin-row-body"><div class="fin-edit"><input class="inp" data-famt type="number" step="0.01" value="' + a + '">' +
+        '<input class="inp" data-fnote type="text" maxlength="80" value="' + esc(e.note || '') + '"></div>' +
+        '<div class="fin-edit-actions"><button class="btn primary sm" data-fsave>Сохранить</button>' +
+        '<button class="btn ghost sm" data-fcancel>Отмена</button></div></div></div>';
+    }
+    const who = (e.who === 'sasha' || e.who === 'dinara') ? e.who : null;
+    const av = who
+      ? '<span class="avatar ' + kopAvatar(who) + '">' + esc((kopName(who).trim()[0] || '?').toUpperCase()) + '</span>'
+      : '<span class="avatar" style="background:var(--text-3)">?</span>';
+    const whoName = who ? esc(kopName(who)) : 'без автора';
+    const cardLink = (e.cardId && state.cards[e.cardId]) ? ' · задача «' + esc(String(state.cards[e.cardId].title).slice(0,40)) + '»' : '';
+    return '<div class="fin-row" data-fin="'+id+'">' + av +
+      '<div class="fin-amt ' + (pos ? 'pos' : 'neg') + '">' + (pos ? '+' : '−') + fmtMoneyRu(a) + '</div>' +
+      '<div class="fin-row-body"><div class="fin-note' + (e.note ? '' : ' empty') + '">' + (e.note ? esc(e.note) : 'без заметки') + '</div>' +
+      '<div class="fin-meta"><span class="who">' + whoName + '</span> · ' + (fmtFull(e.createdAt || 0) || '—') + cardLink + '</div></div>' +
+      '<button class="icon-btn" data-fedit title="Изменить">' + icon('edit',14) + '</button>' +
+      '<button class="icon-btn" data-fdel title="Удалить">' + icon('x',14) + '</button></div>';
+  }).join('');
+}
+
+/* ═══════════ Копилка: события ═══════════ */
+function bindFinance(){
+  function finEnterRoom(){
+    const code = sanitizeRoom($('#finRoomInput').value);
+    if (code.length < 6){ $('#finRoomInput').style.borderColor = 'var(--danger)'; $('#finRoomInput').focus(); return; }
+    $('#finRoomInput').style.borderColor = '';
+    localStorage.setItem(FIN_ROOM_KEY, code);
+    finSubscribe();
+  }
+  $('#finRoomBtn').addEventListener('click', finEnterRoom);
+  $('#finRoomInput').addEventListener('keydown', function(e){ if (e.key === 'Enter'){ e.preventDefault(); finEnterRoom(); } });
+  $('#finRoomChange').addEventListener('click', function(){
+    if (!confirm('Сменить комнату копилки? Записи останутся в старой комнате.')) return;
+    localStorage.removeItem(FIN_ROOM_KEY);
+    if (finUnsub){ finUnsub(); finUnsub = null; }
+    finEntries = {}; finEditId = null;
+    $('#finRoomInput').value = '';
+    renderFinance();
+  });
+  $('#finWho').addEventListener('click', function(e){
+    const b = e.target.closest('button'); if (!b) return;
+    $$('#finWho button').forEach(function(x){ x.classList.toggle('active', x === b); });
+  });
+  $('#finType').addEventListener('click', function(e){
+    const b = e.target.closest('button'); if (!b) return;
+    $$('#finType button').forEach(function(x){ x.classList.toggle('active', x === b); });
+    $('#finAmount').focus();
+  });
+  $('#finForm').addEventListener('submit', function(e){
+    e.preventDefault();
+    if (!finRoom()) return;
+    if (dbUrl() && !fbMode){ $('#finAmount').focus(); return; }
+    const raw = parseFloat($('#finAmount').value);
+    if (!raw || raw <= 0 || !isFinite(raw)){ $('#finAmount').focus(); return; }
+    const whoBtn = $('#finWho button.active');
+    const who = whoBtn ? whoBtn.dataset.who : 'dinara';
+    const tBtn = $('#finType button.active');
+    const type = tBtn ? tBtn.dataset.t : 'add';
+    finAddEntry({
+      amount: type === 'add' ? raw : -raw,
+      note: $('#finNote').value.trim(),
+      who: who,
+      createdAt: Date.now(), updatedAt: Date.now()
+    });
+    $('#finAmount').value = ''; $('#finNote').value = '';
+    $('#finAmount').focus();
+  });
+  $('#finList').addEventListener('click', function(e){
+    const row = e.target.closest('.fin-row'); if (!row) return;
+    const id = row.dataset.fin;
+    if (e.target.closest('[data-fedit]')){ finEditId = id; renderFinance(); return; }
+    if (e.target.closest('[data-fdel]')){
+      const en = finEntries[id];
+      const label = en && en.note ? '«' + en.note + '»' : 'эту запись';
+      if (confirm('Удалить ' + label + '?')){
+        if (finEditId === id) finEditId = null;
+        finRemoveEntry(id);
+      }
+      return;
+    }
+    if (e.target.closest('[data-fsave]')){
+      const amt = parseFloat(row.querySelector('[data-famt]').value);
+      if (!isFinite(amt)){ row.querySelector('[data-famt]').focus(); return; }
+      finUpdateEntry(id, { amount: amt, note: row.querySelector('[data-fnote]').value.trim(), updatedAt: Date.now() });
+      finEditId = null;
+      renderFinance();
+      return;
+    }
+    if (e.target.closest('[data-fcancel]')){ finEditId = null; renderFinance(); }
+  });
+}
+
+/* ═══════════ Переключение вкладок ═══════════ */
+function switchView(v){
+  ui.view = (v === 'finance') ? 'finance' : 'board';
+  try { localStorage.setItem(LS.view, ui.view); } catch(e){}
+  $$('#viewSeg button').forEach(function(b){ b.classList.toggle('active', b.dataset.v === ui.view); });
+  $('#app').classList.toggle('view-finance', ui.view === 'finance');
+  const board = document.querySelector('.board');
+  if (board) board.classList.toggle('hidden', ui.view === 'finance');
+  $('#financeView').classList.toggle('hidden', ui.view !== 'finance');
+  if (ui.view === 'finance') renderFinance();
+}
+
+/* ═══════════ Настройки ═══════════ */
+function openSettings(){
+  $('#stBoardName').value = meta().boardName;
+  $('#stHusband').value = meta().husbandName;
+  $('#stWife').value = meta().wifeName;
+  $$('#stIdentity button').forEach(function(b){ b.classList.toggle('active', b.dataset.v === ui.identity); });
+  const finInfo = finRoom()
+    ? ' Комната копилки: ' + finRoom() + '.'
+    : ' Копилка: код комнаты не задан (вкладка «Копилка»).';
+  $('#stSyncInfo').textContent = (fbMode
+    ? 'Подключено к Firebase: ' + dbUrl().replace(/^https?:\/\//,'').split('/')[0] + '.'
+    : 'Локальный режим — данные хранятся только на этом устройстве. Для синхронизации вставьте URL Firebase Realtime Database в FIREBASE_CONFIG в начале файла index.html.') + finInfo;
+  $('#settingsModal').classList.remove('hidden');
+}
+function closeSettings(){ $('#settingsModal').classList.add('hidden'); }
+function bindSettings(){
+  $('#stIdentity').addEventListener('click', function(e){
+    const b = e.target.closest('button'); if (!b) return;
+    $$('#stIdentity button').forEach(function(x){ x.classList.toggle('active', x === b); });
+  });
+  $('#stSave').addEventListener('click', function(){
+    const bn = $('#stBoardName').value.trim() || 'Наша доска';
+    const hn = $('#stHusband').value.trim() || 'Муж';
+    const wn = $('#stWife').value.trim() || 'Жена';
+    updateMeta({ boardName:bn, husbandName:hn, wifeName:wn });
+    const active = document.querySelector('#stIdentity button.active');
+    ui.identity = active ? active.dataset.v : null;
+    if (ui.identity) localStorage.setItem(LS.id, ui.identity);
+    else localStorage.removeItem(LS.id);
+    closeSettings();
+    renderBoard();
+  });
+  $('#stCancel').addEventListener('click', closeSettings);
+  $('#stClose').addEventListener('click', closeSettings);
+  $('#settingsModal').addEventListener('pointerdown', function(e){ if (e.target === $('#settingsModal')) closeSettings(); });
+}
+
+/* ═══════════ Шапка ═══════════ */
+function bindHeader(){
+  $('#viewSeg').addEventListener('click', function(e){
+    const b = e.target.closest('button');
+    if (b) switchView(b.dataset.v);
+  });
+  $('#tbTitleHost').addEventListener('click', function(e){
+    if (!e.target.closest('.board-title')) return;
+    const span = e.target.closest('.board-title');
+    const inp = h('input', { class:'inp tb-title-inp', value:meta().boardName, maxlength:'60' });
+    span.replaceWith(inp);
+    inp.focus(); inp.select();
+    let done = false;
+    const commit = function(){
+      if (done) return; done = true;
+      const v = inp.value.trim();
+      if (v && v !== meta().boardName) updateMeta({ boardName:v });
+      else renderHeader();
+    };
+    inp.addEventListener('keydown', function(ev){
+      if (ev.key === 'Enter'){ ev.preventDefault(); commit(); }
+      if (ev.key === 'Escape'){ done = true; renderHeader(); }
+    });
+    inp.addEventListener('blur', commit);
+  });
+  const searchInput = $('#searchInput');
+  searchInput.addEventListener('input', debounce(function(){
+    ui.search = searchInput.value.trim();
+    updateFilterUI(); renderBoard();
+  }, 140));
+  $('#searchClear').addEventListener('click', function(){
+    searchInput.value = ''; ui.search = '';
+    updateFilterUI(); renderBoard();
+    searchInput.focus();
+  });
+  $('#assigneeSeg').addEventListener('click', function(e){
+    const b = e.target.closest('button'); if (!b) return;
+    const v = b.dataset.v;
+    if (v !== 'all' && !identityOf()){ openSettings(); return; }
+    ui.assignee = v;
+    updateFilterUI(); renderBoard();
+  });
+  $('#labelFilterBtn').addEventListener('click', function(e){
+    e.stopPropagation();
+    const btn = e.currentTarget;
+    const box = h('div', { style:'min-width:190px' });
+    Object.keys(LABELS).forEach(function(k){
+      const sel = ui.labels.has(k);
+      const row = h('button', { type:'button', class:'menu-it' },
+        h('span', { class:'dot', style:'background:'+LABELS[k].color }),
+        h('span', { style:'flex:1' }, LABELS[k].name),
+        sel ? h('span', { html:icon('check',14), style:'display:inline-flex;color:var(--accent)' }) : null
+      );
+      row.addEventListener('click', function(ev){
+        ev.stopPropagation();
+        if (sel) ui.labels.delete(k); else ui.labels.add(k);
+        updateFilterUI(); renderBoard();
+        openLabelFilterMenu(btn);
+      });
+      box.appendChild(row);
+    });
+    if (ui.labels.size){
+      box.appendChild(h('div', { class:'menu-sep' }));
+      const clear = h('button', { type:'button', class:'menu-it' }, 'Снять метки');
+      clear.addEventListener('click', function(){
+        ui.labels.clear(); updateFilterUI(); renderBoard(); closeMenu();
+      });
+      box.appendChild(clear);
+    }
+    openMenu(btn, [{ custom:box }]);
+  });
+  $('#resetFilters').addEventListener('click', resetFilters);
+  $('#settingsBtn').addEventListener('click', function(){ closeMenu(); openSettings(); });
+  $('#themeBtn').addEventListener('click', function(){
+    applyTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark');
+  });
+  $('#logoutBtn').addEventListener('click', function(){
+    localStorage.removeItem(LS.auth);
+    location.reload();
+  });
+  $('#bannerClose').addEventListener('click', function(){
+    $('#modeBanner').classList.add('hidden');
+    localStorage.setItem(LS.banner, '1');
+  });
+}
+function openLabelFilterMenu(btn){
+  // повторно строим меню с актуальными галочками (не закрывая его)
+  const box = h('div', { style:'min-width:190px' });
+  Object.keys(LABELS).forEach(function(k){
+    const sel = ui.labels.has(k);
+    const row = h('button', { type:'button', class:'menu-it' },
+      h('span', { class:'dot', style:'background:'+LABELS[k].color }),
+      h('span', { style:'flex:1' }, LABELS[k].name),
+      sel ? h('span', { html:icon('check',14), style:'display:inline-flex;color:var(--accent)' }) : null
+    );
+    row.addEventListener('click', function(ev2){
+      ev2.stopPropagation();
+      if (sel) ui.labels.delete(k); else ui.labels.add(k);
+      updateFilterUI(); renderBoard();
+      openLabelFilterMenu(btn);
+    });
+    box.appendChild(row);
+  });
+  if (ui.labels.size){
+    box.appendChild(h('div', { class:'menu-sep' }));
+    const clear = h('button', { type:'button', class:'menu-it' }, 'Снять метки');
+    clear.addEventListener('click', function(){ ui.labels.clear(); updateFilterUI(); renderBoard(); closeMenu(); });
+    box.appendChild(clear);
+  }
+  openMenu(btn, [{ custom:box }]);
+}
+
+/* ═══════════ Вход ═══════════ */
+function isAuthed(){ return localStorage.getItem(LS.auth) === '1'; }
+function showLogin(){
+  $('#login').classList.remove('hidden');
+  $('#app').classList.add('hidden');
+  setTimeout(function(){ $('#loginPass').focus(); }, 60);
+}
+function enterApp(){
+  $('#login').classList.add('hidden');
+  $('#app').classList.remove('hidden');
+  if (!state){ state = defaultState(); saveLocal(); }
+  renderAll();
+  initFirebase();
+  finSubscribe();
+  switchView(ui.view);
+}
+function bindLogin(){
+  $('#loginForm').addEventListener('submit', function(e){
+    e.preventDefault();
+    const v = $('#loginPass').value;
+    if (v === APP_PASSWORD){
+      localStorage.setItem(LS.auth, '1');
+      $('#loginPass').value = '';
+      $('#loginErr').classList.add('hidden');
+      enterApp();
+    } else {
+      $('#loginErr').classList.remove('hidden');
+      const c = $('#loginForm');
+      c.classList.remove('shake'); void c.offsetWidth; c.classList.add('shake');
+      $('#loginPass').select();
+    }
+  });
+}
+
+/* ═══════════ Тема ═══════════ */
+function applyTheme(t){
+  document.documentElement.dataset.theme = t;
+  localStorage.setItem(LS.theme, t);
+  const b = $('#themeBtn');
+  if (b) b.innerHTML = icon(t === 'dark' ? 'sun' : 'moon', 16);
+}
+
+/* ═══════════ Горячие клавиши ═══════════ */
+function bindHotkeys(){
+  document.addEventListener('keydown', function(e){
+    if (e.key === 'Escape'){
+      if (closeMenu()) return;
+      if (dragCtx && dragCtx.started){ cancelDrag(dragCtx); dragCtx = null; detachDragListeners(); return; }
+      if (!$('#cardModal').classList.contains('hidden')){ closeCardModal(); return; }
+      if (!$('#settingsModal').classList.contains('hidden')){ closeSettings(); return; }
+      if (ui.quickAdd){ closeQuickAdd(); return; }
+      const si = $('#searchInput');
+      if (document.activeElement === si && si.value){
+        si.value = ''; ui.search = ''; updateFilterUI(); renderBoard();
+      }
+      return;
+    }
+    const typing = /^(input|textarea|select)$/i.test(e.target.tagName) || e.target.isContentEditable;
+    if (typing) return;
+    if ($('#app').classList.contains('hidden')) return;
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    if (ui.view === 'finance') return;
+    if (e.code === 'Slash'){
+      e.preventDefault();
+      $('#searchInput').focus(); $('#searchInput').select();
+      return;
+    }
+    if (e.code === 'KeyN'){
+      e.preventDefault();
+      const first = sortedColumns()[0];
+      if (first) openQuickAdd(first.id);
+    }
+  });
+}
+
+/* ═══════════ Запуск ═══════════ */
+function boot(){
+  $$('[data-ic]').forEach(function(el){ el.innerHTML = icon(el.dataset.ic, Number(el.dataset.ics || 16)); });
+  applyTheme(localStorage.getItem(LS.theme) || (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'));
+  state = loadLocal();
+  renderHeader();
+  bindHeader(); bindBoardClicks(); bindDragAndDrop(); bindCardModal(); bindSettings(); bindLogin(); bindHotkeys(); bindFinance();
+  updateSyncUI(); updateFilterUI();
+  if (isAuthed()) enterApp(); else showLogin();
+}
+boot();
+
+})();
+</script>
+</body>
+</html>
